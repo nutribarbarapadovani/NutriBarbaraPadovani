@@ -7,7 +7,7 @@ import {
   Search, Plus, X, Users, Calendar, CheckSquare, DollarSign,
   LayoutDashboard, Phone, Mail, MapPin, Tag as TagIcon, Clock,
   AlertTriangle, TrendingUp, ChevronRight, FileText, Activity,
-  MessageCircle, Cake, Stethoscope, Baby
+  MessageCircle, Cake, Stethoscope, Baby, Menu
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -256,6 +256,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [showNewPatient, setShowNewPatient] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -340,14 +341,76 @@ export default function App() {
         ::-webkit-scrollbar-thumb { background: #DCD8CC; border-radius: 8px; }
         button { font-family: inherit; cursor: pointer; }
         input, select, textarea { font-family: inherit; }
+
+        .mobile-menu-btn { display: none; }
+
+        @media (max-width: 860px) {
+          .sidebar {
+            position: fixed !important; top: 0; left: 0; height: 100vh !important;
+            transform: translateX(-100%); transition: transform .25s ease;
+            z-index: 100 !important; width: 250px !important;
+            box-shadow: 8px 0 24px rgba(0,0,0,0.12);
+          }
+          .sidebar.mobile-open { transform: translateX(0); }
+          .sidebar-close-btn { display: flex !important; }
+          .mobile-menu-btn { display: flex !important; }
+          .header { padding: 14px 16px !important; }
+          .header-search { width: 100% !important; }
+          .header-date { display: none !important; }
+          .content { padding: 16px !important; }
+          .cards-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .charts-grid { grid-template-columns: 1fr !important; }
+          .table-header { display: none !important; }
+          .table-row {
+            flex-direction: column !important; align-items: flex-start !important;
+            gap: 5px !important; padding: 14px 0 !important;
+          }
+          .table-row > div { width: 100% !important; }
+          .chevron-col { display: none !important; }
+          .table-row [data-label]::before {
+            content: attr(data-label); display: block; font-size: 10.5px;
+            text-transform: uppercase; letter-spacing: 0.4px; color: #8C99A6; margin-bottom: 1px;
+          }
+          .drawer { width: 100% !important; max-width: 100% !important; }
+          .modal {
+            width: 100% !important; max-width: 100% !important;
+            height: 100% !important; max-height: 100% !important; border-radius: 0 !important;
+            margin: 0 !important;
+          }
+          .info-grid { grid-template-columns: 1fr !important; }
+          .new-patient-grid { grid-template-columns: 1fr !important; padding: 16px !important; }
+          .modal-footer { padding: 12px 16px !important; }
+          .drawer-header, .drawer-body { padding-left: 16px !important; padding-right: 16px !important; }
+          .drawer-tabs { padding: 0 16px !important; overflow-x: auto !important; }
+          .agenda-row { flex-wrap: wrap !important; }
+          .agenda-name { width: 100% !important; }
+          .evo-row { flex-wrap: wrap !important; row-gap: 3px !important; }
+          .evo-row > div { width: auto !important; }
+          .kanban-col { width: 220px !important; }
+        }
+        @media (max-width: 480px) {
+          .cards-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
 
-      <Sidebar view={view} setView={setView} onNewPatient={() => setShowNewPatient(true)} />
+      <Sidebar
+        view={view}
+        setView={(v) => { setView(v); setMobileNavOpen(false); }}
+        onNewPatient={() => { setShowNewPatient(true); setMobileNavOpen(false); }}
+        mobileOpen={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+      />
+      {mobileNavOpen && (
+        <div
+          onClick={() => setMobileNavOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(22,51,46,0.35)", zIndex: 90 }}
+        />
+      )}
 
       <div style={styles.main}>
-        <Header query={query} setQuery={setQuery} />
+        <Header query={query} setQuery={setQuery} onMenuClick={() => setMobileNavOpen(true)} />
 
-        <div style={styles.content}>
+        <div style={styles.content} className="content">
           {view === "dashboard" && (
             <Dashboard patients={patients} followups={followups} setView={setView} setSelectedId={setSelectedId} />
           )}
@@ -390,7 +453,7 @@ export default function App() {
 /* ---------------------------------------------------------
    Sidebar
 --------------------------------------------------------- */
-function Sidebar({ view, setView, onNewPatient }) {
+function Sidebar({ view, setView, onNewPatient, mobileOpen, onClose }) {
   const items = [
     { id: "dashboard", label: "Painel", icon: LayoutDashboard },
     { id: "patients", label: "Pacientes", icon: Users },
@@ -399,15 +462,24 @@ function Sidebar({ view, setView, onNewPatient }) {
     { id: "financeiro", label: "Financeiro", icon: DollarSign }
   ];
   return (
-    <div style={styles.sidebar}>
-      <div style={styles.logo}>
-        <GrowthMark />
-        <div>
-          <div style={{ fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, color: "#16332E" }}>
-            Crescer
+    <div className={`sidebar${mobileOpen ? " mobile-open" : ""}`} style={styles.sidebar}>
+      <div style={{ ...styles.logo, justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <GrowthMark />
+          <div>
+            <div style={{ fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, color: "#16332E" }}>
+              Crescer
+            </div>
+            <div style={{ fontSize: 11, color: "#8C99A6", letterSpacing: 0.4 }}>Nutrição Pediátrica</div>
           </div>
-          <div style={{ fontSize: 11, color: "#8C99A6", letterSpacing: 0.4 }}>Nutrição Pediátrica</div>
         </div>
+        <button
+          className="sidebar-close-btn"
+          onClick={onClose}
+          style={{ display: "none", background: "none", border: "none", color: "#4B615D", padding: 4 }}
+        >
+          <X size={18} />
+        </button>
       </div>
 
       <button style={styles.newBtn} onClick={onNewPatient}>
@@ -445,22 +517,31 @@ function Sidebar({ view, setView, onNewPatient }) {
 /* ---------------------------------------------------------
    Header
 --------------------------------------------------------- */
-function Header({ query, setQuery }) {
+function Header({ query, setQuery, onMenuClick }) {
   const hoje = new Date().toLocaleDateString("pt-BR", {
     weekday: "long", day: "2-digit", month: "long"
   });
   return (
-    <div style={styles.header}>
-      <div style={{ position: "relative", width: 380 }}>
-        <Search size={16} style={{ position: "absolute", left: 12, top: 11, color: "#8C99A6" }} />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nome, diagnóstico, tag, telefone…"
-          style={styles.searchInput}
-        />
+    <div style={styles.header} className="header">
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+        <button
+          className="mobile-menu-btn"
+          onClick={onMenuClick}
+          style={{ background: "none", border: "none", color: "#16332E", padding: 4, flexShrink: 0 }}
+        >
+          <Menu size={20} />
+        </button>
+        <div className="header-search" style={{ position: "relative", width: 380, maxWidth: "100%" }}>
+          <Search size={16} style={{ position: "absolute", left: 12, top: 11, color: "#8C99A6" }} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por nome, diagnóstico, tag, telefone…"
+            style={styles.searchInput}
+          />
+        </div>
       </div>
-      <div style={{ fontSize: 13, color: "#8C99A6", textTransform: "capitalize" }}>{hoje}</div>
+      <div className="header-date" style={{ fontSize: 13, color: "#8C99A6", textTransform: "capitalize", flexShrink: 0, marginLeft: 12 }}>{hoje}</div>
     </div>
   );
 }
@@ -513,7 +594,7 @@ function Dashboard({ patients, followups, setView, setSelectedId }) {
     <div>
       <SectionTitle title="Painel" subtitle="Visão geral da clínica em tempo real" />
 
-      <div style={styles.cardsGrid}>
+      <div style={styles.cardsGrid} className="cards-grid">
         <MetricCard label="Pacientes ativos" value={ativos} icon={Users} accent="#7FAE86" />
         <MetricCard label="Em pausa" value={pausa} icon={Clock} accent="#E8B85E" />
         <MetricCard label="Concluídos" value={concluidos} icon={CheckSquare} accent="#8C99A6" />
@@ -525,7 +606,7 @@ function Dashboard({ patients, followups, setView, setSelectedId }) {
         <MetricCard label="Aniversariantes da semana" value={aniversariantes.length} icon={Cake} accent="#F2704A" />
       </div>
 
-      <div style={styles.chartsGrid}>
+      <div style={styles.chartsGrid} className="charts-grid">
         <div style={styles.panel}>
           <div style={styles.panelTitle}>Evolução do número de pacientes</div>
           <ResponsiveContainer width="100%" height={220}>
@@ -624,7 +705,7 @@ function PatientsList({ patients, onOpen, onNew }) {
         }
       />
       <div style={styles.panel}>
-        <div style={styles.tableHeader}>
+        <div style={styles.tableHeader} className="table-header">
           <div style={{ flex: 2 }}>Paciente</div>
           <div style={{ flex: 1.4 }}>Diagnóstico</div>
           <div style={{ flex: 1 }}>Responsável</div>
@@ -633,20 +714,20 @@ function PatientsList({ patients, onOpen, onNew }) {
           <div style={{ width: 24 }} />
         </div>
         {patients.map((p) => (
-          <div key={p.id} style={styles.tableRow} onClick={() => onOpen(p.id)}>
+          <div key={p.id} style={styles.tableRow} className="table-row" onClick={() => onOpen(p.id)}>
             <div style={{ flex: 2 }}>
               <div style={{ fontWeight: 600, color: "#16332E" }}>{p.nome}</div>
               <div style={{ fontSize: 12, color: "#8C99A6" }}>{calcIdade(p.dataNascimento)}</div>
             </div>
-            <div style={{ flex: 1.4, fontSize: 13, color: "#4B615D" }}>{p.diagnostico}</div>
-            <div style={{ flex: 1, fontSize: 13, color: "#4B615D" }}>{p.responsavel}</div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1.4, fontSize: 13, color: "#4B615D" }} data-label="Diagnóstico">{p.diagnostico}</div>
+            <div style={{ flex: 1, fontSize: 13, color: "#4B615D" }} data-label="Responsável">{p.responsavel}</div>
+            <div style={{ flex: 1 }} data-label="Status">
               <StatusPill status={p.status} />
             </div>
-            <div style={{ flex: 1, fontSize: 13, color: "#4B615D" }}>
+            <div style={{ flex: 1, fontSize: 13, color: "#4B615D" }} data-label="Acompanhamento">
               {p.acompanhamento?.consultasRealizadas}/{p.acompanhamento?.consultasTotal} · {p.acompanhamento?.tipo}
             </div>
-            <div style={{ width: 24, color: "#8C99A6" }}><ChevronRight size={16} /></div>
+            <div className="chevron-col" style={{ width: 24, color: "#8C99A6" }}><ChevronRight size={16} /></div>
           </div>
         ))}
         {patients.length === 0 && <div style={styles.emptyRow}>Nenhum paciente encontrado para essa busca.</div>}
@@ -686,8 +767,8 @@ function PatientDetail({ patient, onClose, onUpdate }) {
 
   return (
     <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.drawer} onClick={(e) => e.stopPropagation()}>
-        <div style={styles.drawerHeader}>
+      <div style={styles.drawer} className="drawer" onClick={(e) => e.stopPropagation()}>
+        <div style={styles.drawerHeader} className="drawer-header">
           <div>
             <div style={{ fontFamily: "Fraunces, serif", fontSize: 22, fontWeight: 600, color: "#16332E" }}>
               {patient.nome}
@@ -699,7 +780,7 @@ function PatientDetail({ patient, onClose, onUpdate }) {
           <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
 
-        <div style={{ display: "flex", gap: 6, padding: "0 24px", borderBottom: "1px solid #EDEAE0" }}>
+        <div className="drawer-tabs" style={{ display: "flex", gap: 6, padding: "0 24px", borderBottom: "1px solid #EDEAE0" }}>
           {tabs.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
@@ -716,7 +797,7 @@ function PatientDetail({ patient, onClose, onUpdate }) {
           })}
         </div>
 
-        <div style={{ padding: 24, overflowY: "auto", flex: 1 }}>
+        <div className="drawer-body" style={{ padding: 24, overflowY: "auto", flex: 1 }}>
           {tab === "dados" && (
             <div>
               <InfoGrid items={[
@@ -776,7 +857,7 @@ function PatientDetail({ patient, onClose, onUpdate }) {
               </ResponsiveContainer>
               <div style={{ marginTop: 12 }}>
                 {(patient.evolucao || []).slice().reverse().map((e, i) => (
-                  <div key={i} style={styles.evoRow}>
+                  <div key={i} style={styles.evoRow} className="evo-row">
                     <div style={{ fontSize: 12, color: "#8C99A6", width: 90 }}>{formatData(e.data)}</div>
                     <div style={{ fontSize: 13, color: "#16332E", width: 70 }}>{e.peso} kg</div>
                     <div style={{ fontSize: 13, color: "#16332E", width: 70 }}>{e.altura} cm</div>
@@ -811,7 +892,7 @@ function PatientDetail({ patient, onClose, onUpdate }) {
 
 function InfoGrid({ items }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 20px" }}>
+    <div className="info-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 20px" }}>
       {items.map(([label, value]) => (
         <div key={label}>
           <div style={{ fontSize: 11, color: "#8C99A6", textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</div>
@@ -852,14 +933,14 @@ function NewPatientModal({ onClose, onSave }) {
 
   return (
     <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <div style={styles.drawerHeader}>
+      <div style={styles.modal} className="modal" onClick={(e) => e.stopPropagation()}>
+        <div style={styles.drawerHeader} className="drawer-header">
           <div style={{ fontFamily: "Fraunces, serif", fontSize: 20, fontWeight: 600, color: "#16332E" }}>
             Novo paciente
           </div>
           <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
-        <div style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, overflowY: "auto" }}>
+        <div className="new-patient-grid" style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, overflowY: "auto" }}>
           <Field label="Nome da criança" value={form.nome} onChange={(v) => set("nome", v)} full />
           <Field label="Data de nascimento" type="date" value={form.dataNascimento} onChange={(v) => set("dataNascimento", v)} />
           <Field label="Sexo" type="select" options={["F", "M"]} value={form.sexo} onChange={(v) => set("sexo", v)} />
@@ -875,7 +956,7 @@ function NewPatientModal({ onClose, onSave }) {
           <Field label="Endereço" value={form.endereco} onChange={(v) => set("endereco", v)} />
           <Field label="Tags (separadas por vírgula)" value={form.tags} onChange={(v) => set("tags", v)} full />
         </div>
-        <div style={{ padding: "16px 24px", borderTop: "1px solid #EDEAE0", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+        <div className="modal-footer" style={{ padding: "16px 24px", borderTop: "1px solid #EDEAE0", display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <button style={styles.secondaryBtn} onClick={onClose}>Cancelar</button>
           <button style={styles.primaryBtn} onClick={submit}>Salvar paciente</button>
         </div>
@@ -930,9 +1011,9 @@ function Agenda({ patients }) {
               {new Date(data + "T00:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
             </div>
             {lista.map((e, i) => (
-              <div key={i} style={styles.agendaRow}>
+              <div key={i} style={styles.agendaRow} className="agenda-row">
                 <Calendar size={15} color="#7FAE86" />
-                <div style={{ fontWeight: 600, color: "#16332E", width: 180 }}>{e.nome}</div>
+                <div className="agenda-name" style={{ fontWeight: 600, color: "#16332E", width: 180 }}>{e.nome}</div>
                 <div style={{ fontSize: 13, color: "#4B615D" }}>{e.tipo}</div>
                 <StatusPill status={e.status} />
               </div>
@@ -957,7 +1038,7 @@ function FollowupsBoard({ followups, patients, onMove }) {
         {KANBAN_COLS.map((col) => {
           const items = followups.filter((f) => f.coluna === col.id);
           return (
-            <div key={col.id} style={styles.kanbanCol}>
+            <div key={col.id} style={styles.kanbanCol} className="kanban-col">
               <div style={styles.kanbanColHeader}>
                 {col.label} <span style={{ color: "#8C99A6", fontWeight: 400 }}>({items.length})</span>
               </div>
@@ -1008,13 +1089,13 @@ function Financeiro({ patients }) {
   return (
     <div>
       <SectionTitle title="Financeiro" subtitle="Planos, pagamentos e inadimplência" />
-      <div style={styles.cardsGrid}>
+      <div style={styles.cardsGrid} className="cards-grid">
         <MetricCard label="Receita prevista" value={formatMoeda(totalPrevisto)} icon={DollarSign} accent="#16332E" />
         <MetricCard label="Receita recebida" value={formatMoeda(totalRecebido)} icon={TrendingUp} accent="#7FAE86" />
         <MetricCard label="Receita pendente" value={formatMoeda(totalPendente)} icon={AlertTriangle} accent="#E8B85E" />
       </div>
       <div style={styles.panel}>
-        <div style={styles.tableHeader}>
+        <div style={styles.tableHeader} className="table-header">
           <div style={{ flex: 2 }}>Paciente</div>
           <div style={{ flex: 1 }}>Plano</div>
           <div style={{ flex: 1 }}>Pagamento</div>
@@ -1023,13 +1104,13 @@ function Financeiro({ patients }) {
           <div style={{ flex: 1 }}>Status</div>
         </div>
         {rows.map((r) => (
-          <div key={r.id} style={styles.tableRow}>
+          <div key={r.id} style={styles.tableRow} className="table-row">
             <div style={{ flex: 2, fontWeight: 600, color: "#16332E" }}>{r.nome}</div>
-            <div style={{ flex: 1, fontSize: 13, color: "#4B615D" }}>{r.acompanhamento?.tipo}</div>
-            <div style={{ flex: 1, fontSize: 13, color: "#4B615D" }}>{r.acompanhamento?.formaPagamento} · {r.acompanhamento?.parcelas}x</div>
-            <div style={{ flex: 1, fontSize: 13, color: "#7FAE86", fontWeight: 600 }}>{formatMoeda(r.recebido)}</div>
-            <div style={{ flex: 1, fontSize: 13, color: "#F2704A", fontWeight: 600 }}>{formatMoeda(r.pendente)}</div>
-            <div style={{ flex: 1 }}><StatusPill status={r.status} /></div>
+            <div style={{ flex: 1, fontSize: 13, color: "#4B615D" }} data-label="Plano">{r.acompanhamento?.tipo}</div>
+            <div style={{ flex: 1, fontSize: 13, color: "#4B615D" }} data-label="Pagamento">{r.acompanhamento?.formaPagamento} · {r.acompanhamento?.parcelas}x</div>
+            <div style={{ flex: 1, fontSize: 13, color: "#7FAE86", fontWeight: 600 }} data-label="Recebido">{formatMoeda(r.recebido)}</div>
+            <div style={{ flex: 1, fontSize: 13, color: "#F2704A", fontWeight: 600 }} data-label="Pendente">{formatMoeda(r.pendente)}</div>
+            <div style={{ flex: 1 }} data-label="Status"><StatusPill status={r.status} /></div>
           </div>
         ))}
       </div>

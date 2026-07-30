@@ -19,6 +19,8 @@ O sistema funciona como um painel único de gestão clínica e relacionamento, c
 
 Busca global por nome, diagnóstico, responsável, telefone ou tag em qualquer tela.
 
+Layout responsivo: menu lateral vira gaveta com botão hamburger, tabelas viram cartões empilhados e o cadastro/detalhe do paciente ocupam a tela cheia em telas de celular (abaixo de 860px).
+
 ## Stack
 
 - React (componente único, hooks: `useState`, `useEffect`, `useMemo`)
