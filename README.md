@@ -95,3 +95,16 @@ Este é um protótipo de **frontend**. Para virar produto em produção, falta i
 ---
 
 Feito para acompanhar a criança e a família com visão de 360°, sem perder relacionamento em planilha.
+
+### Integração com Google Agenda
+
+Na tela **Integrações**, é possível conectar o CRM à conta Google da Bárbara. Depois de conectado, toda vez que um evento é criado/editado/excluído na Agenda, ou um follow-up é criado/concluído, o Google Agenda é atualizado automaticamente — com lembretes (1h antes e 1 dia antes para consultas; 1h antes para follow-ups).
+
+**Configuração inicial (feita uma única vez, direto na tela Integrações do CRM):**
+1. Criar um projeto gratuito no [Google Cloud Console](https://console.cloud.google.com)
+2. Ativar a "Google Calendar API"
+3. Configurar a tela de consentimento OAuth (Externo, com o e-mail da Bárbara como usuário de teste)
+4. Criar uma credencial "ID do cliente OAuth" (tipo Aplicativo da Web), com a URL do CRM em "Origens JavaScript autorizadas"
+5. Colar o Client ID gerado na tela Integrações e clicar em "Conectar com Google Agenda"
+
+**Limitação técnica importante:** como este é um app 100% client-side (sem servidor próprio), a conexão usa o fluxo de autorização por token do Google (Google Identity Services) — o acesso dura algumas horas por sessão de navegador. Se a sincronização parar, um clique em "Conectar com Google Agenda" na tela Integrações restabelece o acesso (geralmente sem precisar autorizar de novo, se a Bárbara continuar logada na conta Google naquele navegador).
