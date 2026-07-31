@@ -7,7 +7,7 @@ import {
   Search, Plus, X, Users, Calendar, CheckSquare, DollarSign,
   LayoutDashboard, Phone, Mail, MapPin, Tag as TagIcon, Clock,
   AlertTriangle, TrendingUp, ChevronRight, FileText, Activity,
-  MessageCircle, Cake, Stethoscope, Baby, Menu
+  MessageCircle, Cake, Stethoscope, Baby, Menu, CheckCircle2, Trash2, Pencil
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -47,180 +47,6785 @@ const diasDesde = (d) => {
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 };
 
+const addMesesData = (dataStr, meses) => {
+  if (!dataStr) return "";
+  const d = new Date(dataStr + "T00:00:00");
+  const inteiros = Math.floor(meses);
+  const fracao = meses - inteiros;
+  d.setMonth(d.getMonth() + inteiros);
+  if (fracao) d.setDate(d.getDate() + Math.round(fracao * 30));
+  return d.toISOString().slice(0, 10);
+};
+
+const maskTelefone = (v) => {
+  const digits = v.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+};
+
+const gerarPagamentosHistorico = (acomp) => {
+  if (!acomp || !acomp.consultasTotal || !acomp.dataInicio) return [];
+  const valorParcela = Math.round((acomp.valor / acomp.consultasTotal) * 100) / 100;
+  const inicio = new Date(acomp.dataInicio + "T00:00:00");
+  const pagamentos = [];
+  for (let i = 0; i < (acomp.consultasRealizadas || 0); i++) {
+    const d = new Date(inicio);
+    d.setMonth(d.getMonth() + i);
+    pagamentos.push({
+      id: uid(),
+      data: d.toISOString().slice(0, 10),
+      valor: valorParcela,
+      formaPagamento: acomp.formaPagamento,
+      tipo: "parcela"
+    });
+  }
+  return pagamentos;
+};
+
 /* ---------------------------------------------------------
    Dados semente (usados apenas na primeira carga)
 --------------------------------------------------------- */
-const seedPatients = () => [
+/* ---------------------------------------------------------
+   Base de pacientes real — importada da planilha de controle
+   (clientes ativos + prospecções ainda não fechadas)
+--------------------------------------------------------- */
+const REAL_PATIENTS = [
   {
-    id: uid(),
-    nome: "Helena Martins",
-    dataNascimento: "2021-03-14",
-    sexo: "F",
-    escola: "Colégio Pequeno Príncipe",
-    diagnostico: "Seletividade alimentar",
-    alergias: "Nenhuma",
-    medicamentos: "-",
-    pediatra: "Dra. Camila Rocha",
-    responsavel: "Fernanda Martins (mãe)",
-    telefone: "(19) 99123-4455",
-    whatsapp: "(19) 99123-4455",
-    email: "fernanda.martins@email.com",
-    endereco: "Paulínia, SP",
-    tags: ["Seletividade alimentar", "Escolar"],
-    status: "ativo",
-    ultimoContato: "2026-07-22",
-    acompanhamento: {
-      tipo: "90 dias", dataInicio: "2026-06-01", dataFim: "2026-08-30",
-      consultasTotal: 4, consultasRealizadas: 2, valor: 1200,
-      formaPagamento: "Pix", parcelas: 3, status: "ativo"
-    },
-    evolucao: [
-      { data: "2026-06-01", peso: 14.2, altura: 96, obs: "Primeira consulta. Recusa vegetais folhosos." },
-      { data: "2026-07-01", peso: 14.8, altura: 97, obs: "Aceitou brócolis picado no arroz." }
+    "id": "rp01",
+    "nome": "Lucca",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Léia",
+    "telefone": "(19) 98844-4987",
+    "whatsapp": "(19) 98844-4987",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 15d"
     ],
-    timeline: [
-      { data: "2026-06-01", tipo: "consulta", texto: "Primeira consulta realizada." },
-      { data: "2026-06-08", tipo: "mensagem", texto: "Follow-up enviado via WhatsApp." },
-      { data: "2026-07-01", tipo: "consulta", texto: "Retorno de 30 dias." }
-    ]
+    "status": "ativo",
+    "ultimoContato": "2026-07-10",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-10",
+        "tipo": "nota",
+        "texto": "Consultas práticas e retornos online regulares."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-07-10",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
   },
   {
-    id: uid(),
-    nome: "Théo Ferraz",
-    dataNascimento: "2024-11-02",
-    sexo: "M",
-    escola: "-",
-    diagnostico: "Introdução alimentar",
-    alergias: "Suspeita de APLV",
-    medicamentos: "-",
-    pediatra: "Dr. Marcelo Andrade",
-    responsavel: "Juliana Ferraz (mãe)",
-    telefone: "(19) 98877-1122",
-    whatsapp: "(19) 98877-1122",
-    email: "ju.ferraz@email.com",
-    endereco: "Campinas, SP",
-    tags: ["Introdução alimentar", "Alergia", "Lactente"],
-    status: "ativo",
-    ultimoContato: "2026-07-28",
-    acompanhamento: {
-      tipo: "6 meses", dataInicio: "2026-05-10", dataFim: "2026-11-10",
-      consultasTotal: 6, consultasRealizadas: 3, valor: 2400,
-      formaPagamento: "Cartão", parcelas: 6, status: "ativo"
-    },
-    evolucao: [
-      { data: "2026-05-10", peso: 7.1, altura: 66, obs: "Início da introdução alimentar." },
-      { data: "2026-06-10", peso: 7.9, altura: 68, obs: "Boa evolução, sem reações." },
-      { data: "2026-07-10", peso: 8.5, altura: 70, obs: "Investigar possível APLV." }
+    "id": "rp02",
+    "nome": "Arthur",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "Seletividade alimentar",
+    "alergias": "",
+    "medicamentos": "Uso de suplementação (orientada)",
+    "pediatra": "",
+    "responsavel": "Larissa",
+    "telefone": "(19) 99413-3394",
+    "whatsapp": "(19) 99413-3394",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 15d"
     ],
-    timeline: [
-      { data: "2026-05-10", tipo: "consulta", texto: "Primeira consulta." },
-      { data: "2026-07-10", tipo: "consulta", texto: "Encaminhado para exame de alergia." },
-      { data: "2026-07-28", tipo: "mensagem", texto: "Família enviou fotos da aceitação alimentar." }
-    ]
+    "status": "ativo",
+    "ultimoContato": "2026-04-09",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-04-09",
+        "tipo": "nota",
+        "texto": "Seletividade alimentar, uso de suplementação, evolução positiva."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-04-09",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
   },
   {
-    id: uid(),
-    nome: "Isadora Prado",
-    dataNascimento: "2016-08-30",
-    sexo: "F",
-    escola: "EE Prof. José Lima",
-    diagnostico: "Obesidade infantil",
-    alergias: "Nenhuma",
-    medicamentos: "-",
-    pediatra: "Dra. Renata Silva",
-    responsavel: "Marcos Prado (pai)",
-    telefone: "(19) 99555-8877",
-    whatsapp: "(19) 99555-8877",
-    email: "marcos.prado@email.com",
-    endereco: "Paulínia, SP",
-    tags: ["Obesidade", "Escolar"],
-    status: "pausa",
-    ultimoContato: "2026-06-02",
-    acompanhamento: {
-      tipo: "12 meses", dataInicio: "2025-10-01", dataFim: "2026-10-01",
-      consultasTotal: 12, consultasRealizadas: 7, valor: 4800,
-      formaPagamento: "Boleto", parcelas: 12, status: "pausa"
-    },
-    evolucao: [
-      { data: "2026-04-01", peso: 48.2, altura: 142, obs: "Redução de 1kg no trimestre." },
-      { data: "2026-06-01", peso: 47.0, altura: 143, obs: "Família pausou por viagem." }
+    "id": "rp03",
+    "nome": "Eduardo (Dudu)",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Josyane",
+    "telefone": "(19) 99800-4657",
+    "whatsapp": "(19) 99800-4657",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 30d"
     ],
-    timeline: [
-      { data: "2026-06-02", tipo: "nota", texto: "Família solicitou pausa temporária." }
-    ]
+    "status": "ativo",
+    "ultimoContato": "2026-04-30",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-04-30",
+        "tipo": "nota",
+        "texto": "Receitas enviadas, evoluindo bem."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-04-30",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
   },
   {
-    id: uid(),
-    nome: "Davi Ribeiro",
-    dataNascimento: "2019-01-19",
-    sexo: "M",
-    escola: "Colégio Aprender",
-    diagnostico: "TEA - seletividade severa",
-    alergias: "Nenhuma",
-    medicamentos: "Suplemento vitamínico",
-    pediatra: "Dr. Marcelo Andrade",
-    responsavel: "Patrícia Ribeiro (mãe)",
-    telefone: "(19) 99222-3344",
-    whatsapp: "(19) 99222-3344",
-    email: "patricia.ribeiro@email.com",
-    endereco: "Paulínia, SP",
-    tags: ["TEA", "Seletividade alimentar", "Escolar"],
-    status: "ativo",
-    ultimoContato: "2026-07-29",
-    acompanhamento: {
-      tipo: "24 meses", dataInicio: "2025-08-01", dataFim: "2027-08-01",
-      consultasTotal: 24, consultasRealizadas: 11, valor: 9600,
-      formaPagamento: "Pix", parcelas: 24, status: "ativo"
-    },
-    evolucao: [
-      { data: "2026-06-15", peso: 18.4, altura: 108, obs: "Aceita 6 alimentos novos." },
-      { data: "2026-07-15", peso: 18.9, altura: 109, obs: "Introduziu proteína animal." }
+    "id": "rp04",
+    "nome": "Guilherme (Gui)",
+    "dataNascimento": "2025-04-18",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "Introdução alimentar (BLW) em andamento",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Aline",
+    "telefone": "(19) 98193-8967",
+    "whatsapp": "(19) 98193-8967",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 90d"
     ],
-    timeline: [
-      { data: "2026-07-15", tipo: "consulta", texto: "Retorno mensal realizado." },
-      { data: "2026-07-29", tipo: "mensagem", texto: "Pergunta sobre adaptação na escola." }
-    ]
+    "status": "ativo",
+    "ultimoContato": "2026-04-18",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-04-18",
+        "tipo": "nota",
+        "texto": "Completou 1 ano, BLW em andamento; agendar consulta de 1 aninho."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-04-18",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
   },
   {
-    id: uid(),
-    nome: "Manuela Costa",
-    dataNascimento: "2020-05-05",
-    sexo: "F",
-    escola: "Escola Semear",
-    diagnostico: "Constipação funcional",
-    alergias: "Nenhuma",
-    medicamentos: "-",
-    pediatra: "Dra. Camila Rocha",
-    responsavel: "Bianca Costa (mãe)",
-    telefone: "(19) 98111-9900",
-    whatsapp: "(19) 98111-9900",
-    email: "bianca.costa@email.com",
-    endereco: "Paulínia, SP",
-    tags: ["Constipação", "Escolar"],
-    status: "concluido",
-    ultimoContato: "2026-05-20",
-    acompanhamento: {
-      tipo: "90 dias", dataInicio: "2026-02-20", dataFim: "2026-05-20",
-      consultasTotal: 4, consultasRealizadas: 4, valor: 1200,
-      formaPagamento: "Pix", parcelas: 1, status: "concluido"
-    },
-    evolucao: [
-      { data: "2026-05-20", peso: 16.1, altura: 104, obs: "Alta nutricional. Hábito intestinal regular." }
+    "id": "rp05",
+    "nome": "Liz",
+    "dataNascimento": "2025-09-02",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Carolina",
+    "telefone": "(19) 99922-0029",
+    "whatsapp": "(19) 99922-0029",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 90d"
     ],
-    timeline: [
-      { data: "2026-05-20", tipo: "consulta", texto: "Alta do acompanhamento." }
-    ]
+    "status": "ativo",
+    "ultimoContato": "2026-07-02",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-02",
+        "tipo": "nota",
+        "texto": "Aproximadamente 10 meses; receitas e brincadeiras enviadas."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-07-02",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp06",
+    "nome": "Alice",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "Avaliação bucal em andamento (laudo odontológico compartilhado)",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Micaela",
+    "telefone": "(19) 99906-8162",
+    "whatsapp": "(19) 99906-8162",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 30d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-06-30",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-30",
+        "tipo": "nota",
+        "texto": "Consulta adiada por questão bucal da filha; laudo compartilhado."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-06-30",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp07",
+    "nome": "Benício",
+    "dataNascimento": "2019-06-25",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Nayara",
+    "telefone": "(19) 99919-2572",
+    "whatsapp": "(19) 99919-2572",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Novo paciente",
+      "Convênio",
+      "Retorno a cada 15d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-06-25",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-25",
+        "tipo": "nota",
+        "texto": "7 anos; atendimento via convênio Unimed; pagamento enviado."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-06-25",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp08",
+    "nome": "Lívia",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "Investigação de alergia alimentar",
+    "alergias": "Investigação de alergia a ovo",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Lí",
+    "telefone": "(19) 98866-9193",
+    "whatsapp": "(19) 98866-9193",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Convênio",
+      "Retorno a cada 15d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-06-02",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-02",
+        "tipo": "nota",
+        "texto": "Investigação de alergia a ovo; convênio Unimed."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-06-02",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp09",
+    "nome": "Eduardo (Dudu)",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Karina",
+    "telefone": "(19) 99925-4334",
+    "whatsapp": "(19) 99925-4334",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 30d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-03-24",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-03-24",
+        "tipo": "nota",
+        "texto": "Evolução boa."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-03-24",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp10",
+    "nome": "Liz",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "Investigação de alergia alimentar (exame realizado)",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Luanne",
+    "telefone": "(21) 96444-5331",
+    "whatsapp": "(21) 96444-5331",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 15d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-06-03",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-03",
+        "tipo": "nota",
+        "texto": "Resultados de exame de alergia; agendamento de refeição."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-06-03",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp11",
+    "nome": "Benício",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "Avaliação inicial concluída, plano de ação entregue",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Thaís",
+    "telefone": "(19) 97132-1813",
+    "whatsapp": "(19) 97132-1813",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Avaliação feita",
+      "Retorno a cada 15d",
+      "Irmão(ã): Giovana"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-06-21",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-21",
+        "tipo": "nota",
+        "texto": "Avaliação presencial feita; plano de ação inicial entregue (2 filhos)."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-06-21",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp12",
+    "nome": "Giovana",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "Avaliação inicial concluída, plano de ação entregue",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Thaís",
+    "telefone": "(19) 97132-1813",
+    "whatsapp": "(19) 97132-1813",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Avaliação feita",
+      "Retorno a cada 15d",
+      "Irmão(ã): Benício"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-06-21",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-21",
+        "tipo": "nota",
+        "texto": "Avaliação presencial feita; plano de ação inicial entregue (2 filhos)."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-06-21",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp13",
+    "nome": "Melissa",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "Avaliação inicial concluída, plano de ação entregue",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Flávia",
+    "telefone": "(19) 99173-9590",
+    "whatsapp": "(19) 99173-9590",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 15d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-06-18",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-18",
+        "tipo": "nota",
+        "texto": "Consulta presencial feita; plano de ação entregue."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-06-18",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp14",
+    "nome": "Lívia",
+    "dataNascimento": "2025-08-18",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Camilly",
+    "telefone": "(51) 9194-5037",
+    "whatsapp": "(51) 9194-5037",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Novo paciente",
+      "Retorno a cada 90d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-06-18",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-18",
+        "tipo": "nota",
+        "texto": "10 meses; primeira sessão paga agendada, pagamento enviado."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-06-18",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp15",
+    "nome": "Theo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Letícia",
+    "telefone": "(48) 9918-4200",
+    "whatsapp": "(48) 9918-4200",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 30d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-04-14",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-04-14",
+        "tipo": "nota",
+        "texto": "Início adiado, retomou contato depois."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-04-14",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp16",
+    "nome": "Isabella (Isa)",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Leticia",
+    "telefone": "(19) 98137-7125",
+    "whatsapp": "(19) 98137-7125",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 15d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-05-25",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-05-25",
+        "tipo": "nota",
+        "texto": "Materiais enviados pós-consulta."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-05-25",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp17",
+    "nome": "Arthur",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Juliana",
+    "telefone": "(11) 98906-7062",
+    "whatsapp": "(11) 98906-7062",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Novo paciente",
+      "Retorno a cada 30d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-05-28",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-05-28",
+        "tipo": "nota",
+        "texto": "Primeira sessão agendada (28/05)."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-05-28",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp18",
+    "nome": "Manu",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Lais",
+    "telefone": "(19) 98141-0818",
+    "whatsapp": "(19) 98141-0818",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Avaliação feita",
+      "Retorno a cada 30d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-05-06",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-05-06",
+        "tipo": "nota",
+        "texto": "Primeira reunião online feita; follow-up sem resposta."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-05-06",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp19",
+    "nome": "Isabelly",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Carol",
+    "telefone": "(19) 98323-2640",
+    "whatsapp": "(19) 98323-2640",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Novo paciente",
+      "Retorno a cada 30d",
+      "Irmão(ã): Leo"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-04-23",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-04-23",
+        "tipo": "nota",
+        "texto": "Pagamento confirmado, link enviado (2 filhos)."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-04-23",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp20",
+    "nome": "Leo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Carol",
+    "telefone": "(19) 98323-2640",
+    "whatsapp": "(19) 98323-2640",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Novo paciente",
+      "Retorno a cada 30d",
+      "Irmão(ã): Isabelly"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-04-23",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-04-23",
+        "tipo": "nota",
+        "texto": "Pagamento confirmado, link enviado (2 filhos)."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-04-23",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp21",
+    "nome": "Alice",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Ana",
+    "telefone": "(61) 8583-6511",
+    "whatsapp": "(61) 8583-6511",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno atrasado",
+      "Retorno a cada 90d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-03-20",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-03-20",
+        "tipo": "nota",
+        "texto": "Acompanhamento ativo; última mensagem sem resposta."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-03-20",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp22",
+    "nome": "Leonardo (Léo)",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Juliana",
+    "telefone": "(19) 99958-5306",
+    "whatsapp": "(19) 99958-5306",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Novo paciente",
+      "Retorno a cada 15d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-04-28",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-04-28",
+        "tipo": "nota",
+        "texto": "Confirmou início; consulta agendada 28/04."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-04-28",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp23",
+    "nome": "Cecília",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "Acompanhamento com visitas domiciliares",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Natália",
+    "telefone": "(19) 98934-8990",
+    "whatsapp": "(19) 98934-8990",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 30d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-03-29",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-03-29",
+        "tipo": "nota",
+        "texto": "Visitas domiciliares para observar alimentação; reagendamentos."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-03-29",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp24",
+    "nome": "Maya",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "Acompanhamento por videochamada",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Bianca",
+    "telefone": "+447533090598",
+    "whatsapp": "+447533090598",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 15d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-03-26",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-03-26",
+        "tipo": "nota",
+        "texto": "Chamadas de vídeo para observar refeições; materiais enviados."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-03-26",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp25",
+    "nome": "Luiza (Lulu)",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Giovanna",
+    "telefone": "(19) 99119-5555",
+    "whatsapp": "(19) 99119-5555",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 30d",
+      "Irmão(ã): Heitor"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-03-25",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-03-25",
+        "tipo": "nota",
+        "texto": "Acompanhamento de rotina alimentar dos dois filhos."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-03-25",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp26",
+    "nome": "Heitor",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Giovanna",
+    "telefone": "(19) 99119-5555",
+    "whatsapp": "(19) 99119-5555",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 30d",
+      "Irmão(ã): Luiza (Lulu)"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-03-25",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-03-25",
+        "tipo": "nota",
+        "texto": "Acompanhamento de rotina alimentar dos dois filhos."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-03-25",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp27",
+    "nome": "Laura (Laurinha)",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Luciana",
+    "telefone": "(19) 98338-0715",
+    "whatsapp": "(19) 98338-0715",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno atrasado",
+      "Retorno a cada 30d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2025-11-24",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2025-11-24",
+        "tipo": "nota",
+        "texto": "Solicitou agendar retorno; sem confirmação."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2025-11-24",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp28",
+    "nome": "Matias",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Hillary",
+    "telefone": "(19) 99672-9575",
+    "whatsapp": "(19) 99672-9575",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno a cada 30d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2025-11-10",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2025-11-10",
+        "tipo": "nota",
+        "texto": "Feedback positivo sobre alimentação do filho (conta comercial de salão de beleza)."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2025-11-10",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp29",
+    "nome": "Yuri",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Giedre",
+    "telefone": "(19) 99460-7645",
+    "whatsapp": "(19) 99460-7645",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Novo paciente",
+      "Retorno a cada 30d",
+      "Confirmar dados manualmente"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-05-27",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-05-27",
+        "tipo": "nota",
+        "texto": "Pouco contexto disponível (apenas áudio) - confirmar manualmente."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-05-27",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp30",
+    "nome": "Raquel Vitória",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "Produto digital (e-book) — não é acompanhamento clínico individual",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Rebeca",
+    "telefone": "(11) 97735-4380",
+    "whatsapp": "(11) 97735-4380",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Novo paciente",
+      "Retorno a cada 30d"
+    ],
+    "status": "concluido",
+    "ultimoContato": "2026-06-24",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-24",
+        "tipo": "nota",
+        "texto": "Compra de e-book de receitas (produto digital), não acompanhamento individual."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Produto digital (e-book) — não é acompanhamento clínico individual",
+      "dataInicio": "2026-06-24",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "concluido"
+    }
+  },
+  {
+    "id": "rp31",
+    "nome": "Teresa",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Bruna",
+    "telefone": "(19) 99354-3661",
+    "whatsapp": "(19) 99354-3661",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Novo paciente",
+      "Retorno a cada 90d",
+      "Confirmar dados manualmente"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-06-23",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-23",
+        "tipo": "nota",
+        "texto": "Conteúdo limitado, tom informal - confirmar manualmente."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-06-23",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
+  },
+  {
+    "id": "rp32",
+    "nome": "Amélie",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "Curso \"Mamães Sem Culpa\" — não é acompanhamento clínico individual",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Evelin",
+    "telefone": "(11) 94089-3732",
+    "whatsapp": "(11) 94089-3732",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Novo paciente"
+    ],
+    "status": "concluido",
+    "ultimoContato": "2026-04-24",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-04-24",
+        "tipo": "nota",
+        "texto": "Cliente do curso \"Mamães Sem Culpa\", não acompanhamento clínico individual."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Curso \"Mamães Sem Culpa\" — não é acompanhamento clínico individual",
+      "dataInicio": "2026-04-24",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "concluido"
+    }
+  },
+  {
+    "id": "rp33",
+    "nome": "Evelin",
+    "dataNascimento": "2014-04-17",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "Acompanhamento nutricional quinzenal",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Tania",
+    "telefone": "(19) 98397-9679",
+    "whatsapp": "(19) 98397-9679",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno atrasado",
+      "Retorno a cada 15d"
+    ],
+    "status": "pausa",
+    "ultimoContato": "2026-04-17",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-04-17",
+        "tipo": "nota",
+        "texto": "Acompanhamento quinzenal (paciente com 12 anos). Pagamento confirmado desde marco/2026. Mae pediu para pausar o retorno devido a rotina; previsao de retomar em agosto/2026. Movida da aba \"Ainda nao fecharam\". OBS: conversa recente no WhatsApp com esta mae trata de introducao alimentar de um bebe - a confirmar com a nutricionista se refere a outro dependente/paciente, pois nao corresponde a idade da Evelin."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-04-17",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "pausa"
+    }
+  },
+  {
+    "id": "rp34",
+    "nome": "Noah",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "Terapia alimentar quinzenal (Clínica Interdisciplinar Zelo)",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Marcela",
+    "telefone": "(11) 98389-0779",
+    "whatsapp": "(11) 98389-0779",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Retorno atrasado",
+      "Retorno a cada 15d"
+    ],
+    "status": "ativo",
+    "ultimoContato": "2026-06-22",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-22",
+        "tipo": "nota",
+        "texto": "Terapia alimentar quinzenal; atendimentos via Clinica Interdisciplinar Zelo (grupo \"Equipe Zelo\"). Sessao de 29/06 cancelada (jogo do Brasil); reagendamento nao confirmado ate o momento (ultima troca em 30/06 ainda buscando novo horario). Pagamentos organizados mensalmente por sessao. Contato nao estava salvo com a palavra \"mae\" (apenas \"Marcela\"), por isso nao constava na planilha ate agora."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Consulta avulsa",
+      "dataInicio": "2026-06-22",
+      "dataFim": "",
+      "consultasTotal": 1,
+      "consultasRealizadas": 1,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "ativo"
+    }
   }
 ];
 
-const seedFollowups = (patients) => [
-  { id: uid(), pacienteId: patients[0].id, titulo: "Cobrar retorno de 30 dias", tipo: "Cobrar retorno", prioridade: "alta", prazo: "2026-07-31", coluna: "hoje", responsavel: "Nutricionista" },
-  { id: uid(), pacienteId: patients[1].id, titulo: "Solicitar exame de alergia", tipo: "Solicitar exames", prioridade: "alta", prazo: "2026-08-01", coluna: "aguardando", responsavel: "Secretária" },
-  { id: uid(), pacienteId: patients[2].id, titulo: "Cobrar pagamento da parcela 8", tipo: "Cobrar pagamento", prioridade: "media", prazo: "2026-08-03", coluna: "afazer", responsavel: "Secretária" },
-  { id: uid(), pacienteId: patients[3].id, titulo: "Enviar plano alimentar atualizado", tipo: "Enviar plano", prioridade: "media", prazo: "2026-07-30", coluna: "andamento", responsavel: "Nutricionista" },
-  { id: uid(), pacienteId: patients[3].id, titulo: "Responder dúvida sobre escola", tipo: "Enviar mensagem", prioridade: "baixa", prazo: "2026-07-30", coluna: "hoje", responsavel: "Nutricionista" },
-  { id: uid(), pacienteId: patients[4].id, titulo: "Enviar pesquisa de satisfação pós-alta", tipo: "Enviar materiais", prioridade: "baixa", prazo: "2026-08-05", coluna: "concluido", responsavel: "Secretária" }
+const PROSPECTS = [
+  {
+    "id": "pr001",
+    "nome": "Arthur",
+    "dataNascimento": "2022-06-20",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Daniela",
+    "telefone": "(19) 98302-3977",
+    "whatsapp": "(19) 98302-3977",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Interessada - aguardando confirmação de horário"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-06-20",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-20",
+        "tipo": "nota",
+        "texto": "Conversa gratuita ainda não agendada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr002",
+    "nome": "Betina",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Alline",
+    "telefone": "(19) 99555-8202",
+    "whatsapp": "(19) 99555-8202",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Interessada - remarcado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-06-29",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-29",
+        "tipo": "nota",
+        "texto": "Perdeu primeiro encontro, remarcou para quinta às 9h"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr003",
+    "nome": "Manu (salvo como Pedro)",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Marina",
+    "telefone": "(19) 98413-5553",
+    "whatsapp": "(19) 98413-5553",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou - motivo financeiro",
+      "Contato salvo como \"Pedro\""
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-06-25",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-25",
+        "tipo": "nota",
+        "texto": "Decidiu não fazer acompanhamento por questões financeiras"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr004",
+    "nome": "Maria",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Marcela",
+    "telefone": "(31) 8344-7840",
+    "whatsapp": "(31) 8344-7840",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Proposta enviada - aguardando decisão"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-06-22",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-22",
+        "tipo": "nota",
+        "texto": "Proposta de 4 meses (R$525x4 ou R$2100) enviada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr005",
+    "nome": "Filho(a) de Raquel mãe",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Raquel mãe",
+    "telefone": "(19) 99183-1819",
+    "whatsapp": "(19) 99183-1819",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Proposta enviada - aguardando decisão"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-06-20",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-20",
+        "tipo": "nota",
+        "texto": "Recebeu opções de pagamento, respondeu por áudio"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr006",
+    "nome": "Sofia",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Valéria",
+    "telefone": "(19) 99301-7636",
+    "whatsapp": "(19) 99301-7636",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou - motivo financeiro"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-06-19",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-19",
+        "tipo": "nota",
+        "texto": "Disse que pode retomar em alguns meses"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr007",
+    "nome": "Noan",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Inês",
+    "telefone": "+352691154811",
+    "whatsapp": "+352691154811",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou - motivo financeiro"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-06-17",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-17",
+        "tipo": "nota",
+        "texto": "Recebeu orientações gratuitas"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr008",
+    "nome": "Mavie",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Danielle",
+    "telefone": "(19) 99104-1067",
+    "whatsapp": "(19) 99104-1067",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Interessada - só por convênio",
+      "Prefere convênio"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-06-08",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-08",
+        "tipo": "nota",
+        "texto": "Prefere atendimento por convênio, não particular"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr009",
+    "nome": "Helena",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Amanda",
+    "telefone": "(14) 99137-6790",
+    "whatsapp": "(14) 99137-6790",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Tentando agendar"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-06-06",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-06",
+        "tipo": "nota",
+        "texto": "Sem confirmação de horário para conversa inicial"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr010",
+    "nome": "Eva",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Camila",
+    "telefone": "(19) 98823-2769",
+    "whatsapp": "(19) 98823-2769",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Cancelou consulta"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-06-05",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-05",
+        "tipo": "nota",
+        "texto": "Precisa convencer o marido"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr011",
+    "nome": "Isa",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Vanessa",
+    "telefone": "(19) 99100-5960",
+    "whatsapp": "(19) 99100-5960",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-06-03",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-03",
+        "tipo": "nota",
+        "texto": "Respostas por áudio, sem confirmação"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr012",
+    "nome": "Romeu",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Tayná",
+    "telefone": "(19) 99322-4499",
+    "whatsapp": "(19) 99322-4499",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Interessada, sem retorno"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-06-03",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-03",
+        "tipo": "nota",
+        "texto": "Aguardando se organizar financeiramente"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr013",
+    "nome": "Noah",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Geovana",
+    "telefone": "(19) 99306-9645",
+    "whatsapp": "(19) 99306-9645",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Material gratuito enviado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-06-03",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-03",
+        "tipo": "nota",
+        "texto": "Aguardando decisão sobre acompanhamento"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr014",
+    "nome": "Anthony",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Karla",
+    "telefone": "(83) 8656-9697",
+    "whatsapp": "(83) 8656-9697",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-06-03",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-06-03",
+        "tipo": "nota",
+        "texto": "Aguardando definição de horário"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr015",
+    "nome": "Samuel",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Alice",
+    "telefone": "(19) 98937-1153",
+    "whatsapp": "(19) 98937-1153",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-05-23",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-05-23",
+        "tipo": "nota",
+        "texto": "Decidiu continuar por conta própria, já contatada 2x"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr016",
+    "nome": "Rafael",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Fabiana",
+    "telefone": "(19) 99210-1120",
+    "whatsapp": "(19) 99210-1120",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou - precisa de convênio"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-05-20",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr017",
+    "nome": "Rafael",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Pri",
+    "telefone": "(19) 99615-5596",
+    "whatsapp": "(19) 99615-5596",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou - sem condições"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-05-20",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-05-20",
+        "tipo": "nota",
+        "texto": "Rotina difícil, sem suporte, sem condições no momento"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr018",
+    "nome": "Bruna",
+    "dataNascimento": "2017-05-20",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Carolina mãe",
+    "telefone": "(19) 98108-1969",
+    "whatsapp": "(19) 98108-1969",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou - buscando convênio",
+      "Prefere convênio"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-05-20",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-05-20",
+        "tipo": "nota",
+        "texto": "Optou por tentar Unimed por questão financeira"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr019",
+    "nome": "Lorenzo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Amanda",
+    "telefone": "(11) 97032-6890",
+    "whatsapp": "(11) 97032-6890",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Negociação avançada"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-04-24",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-04-24",
+        "tipo": "nota",
+        "texto": "Alinhadas, mas encontro não confirmado"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr020",
+    "nome": "Miguel",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Tamires",
+    "telefone": "(19) 99722-9176",
+    "whatsapp": "(19) 99722-9176",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Adiou por questão financeira"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-04-17",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-04-17",
+        "tipo": "nota",
+        "texto": "Decidiu iniciar mas adiou; aguardando reorganização financeira"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr021",
+    "nome": "Murilo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Iza",
+    "telefone": "(19) 99256-2764",
+    "whatsapp": "(19) 99256-2764",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Proposta enviada"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-03-09",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-03-09",
+        "tipo": "nota",
+        "texto": "Proposta completa (11 encontros/5 meses) enviada, sem confirmação"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr022",
+    "nome": "Lara",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Luciana",
+    "telefone": "(19) 99236-4892",
+    "whatsapp": "(19) 99236-4892",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-03-02",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-03-02",
+        "tipo": "nota",
+        "texto": "Apenas 1 áudio recebido, sem continuidade"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr023",
+    "nome": "Helena",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Juliana",
+    "telefone": "(19) 97423-4145",
+    "whatsapp": "(19) 97423-4145",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Link de pagamento enviado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-12",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-12",
+        "tipo": "nota",
+        "texto": "R$2.100 enviado, sem confirmação de pagamento"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr024",
+    "nome": "José",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Nayara",
+    "telefone": "(61) 8157-3013",
+    "whatsapp": "(61) 8157-3013",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-09",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-09",
+        "tipo": "nota",
+        "texto": "Apenas áudio, sem retorno"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr025",
+    "nome": "Rafael",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Isabella",
+    "telefone": "(65) 8167-1176",
+    "whatsapp": "(65) 8167-1176",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-08",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-08",
+        "tipo": "nota",
+        "texto": "Apenas áudio, sem retorno"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr026",
+    "nome": "Lucas",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Evelyn",
+    "telefone": "(19) 99436-5981",
+    "whatsapp": "(19) 99436-5981",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contexto limitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-01-27",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-01-27",
+        "tipo": "nota",
+        "texto": "Troca mínima de mensagens"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr027",
+    "nome": "Manuella",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Carol",
+    "telefone": "(19) 99554-0404",
+    "whatsapp": "(19) 99554-0404",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-01-16",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-01-16",
+        "tipo": "nota",
+        "texto": "Apenas áudio, sem retorno"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr028",
+    "nome": "Filho(a) de Samila",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Samila",
+    "telefone": "(19) 98127-5567",
+    "whatsapp": "(19) 98127-5567",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contexto limitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-01-13",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-01-13",
+        "tipo": "nota",
+        "texto": "Mensagem mínima"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr029",
+    "nome": "Lívia",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Andressa",
+    "telefone": "(19) 99792-5868",
+    "whatsapp": "(19) 99792-5868",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contexto limitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-01-08",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-01-08",
+        "tipo": "nota",
+        "texto": "Mensagem mínima"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr030",
+    "nome": "Lolo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Tamires",
+    "telefone": "(19) 98314-3993",
+    "whatsapp": "(19) 98314-3993",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contexto limitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2025-12-23",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2025-12-23",
+        "tipo": "nota",
+        "texto": "Histórico anterior não disponível"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr031",
+    "nome": "Maria Gabriela",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Paty",
+    "telefone": "(19) 98902-8986",
+    "whatsapp": "(19) 98902-8986",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Aguardando alinhamento"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2025-12-16",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2025-12-16",
+        "tipo": "nota",
+        "texto": "Disse que poderia alinhar em janeiro"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr032",
+    "nome": "José Pedro",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Amanda",
+    "telefone": "(19) 99173-6934",
+    "whatsapp": "(19) 99173-6934",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contexto limitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2025-12-13",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2025-12-13",
+        "tipo": "nota",
+        "texto": "Mensagem mínima"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr033",
+    "nome": "Cristian",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Thalyta",
+    "telefone": "(65) 9650-9159",
+    "whatsapp": "(65) 9650-9159",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contexto limitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2025-11-28",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2025-11-28",
+        "tipo": "nota",
+        "texto": "Apenas link de reunião enviado"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr034",
+    "nome": "Valentina",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Paula",
+    "telefone": "(19) 98182-9361",
+    "whatsapp": "(19) 98182-9361",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contexto limitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2025-11-24",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2025-11-24",
+        "tipo": "nota",
+        "texto": "Apenas áudio"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr035",
+    "nome": "Agape",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Thalita",
+    "telefone": "(19) 99229-4064",
+    "whatsapp": "(19) 99229-4064",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contexto limitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2025-11-20",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2025-11-20",
+        "tipo": "nota",
+        "texto": "Mensagem mínima"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr036",
+    "nome": "Bernardo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Ale",
+    "telefone": "(19) 98342-9941",
+    "whatsapp": "(19) 98342-9941",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contexto limitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2025-11-19",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2025-11-19",
+        "tipo": "nota",
+        "texto": "Mensagem mínima"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr037",
+    "nome": "Julia",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Felisa",
+    "telefone": "(19) 99683-0779",
+    "whatsapp": "(19) 99683-0779",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contexto limitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2025-11-15",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2025-11-15",
+        "tipo": "nota",
+        "texto": "Apenas áudio curto"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr038",
+    "nome": "Heitor",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Heibe",
+    "telefone": "(79) 9825-3517",
+    "whatsapp": "(79) 9825-3517",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contexto limitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2025-11-06",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2025-11-06",
+        "tipo": "nota",
+        "texto": "Sem texto disponível"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr039",
+    "nome": "Gael",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Vanessa",
+    "telefone": "(19) 98383-0070",
+    "whatsapp": "(19) 98383-0070",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contexto limitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2025-11-04",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2025-11-04",
+        "tipo": "nota",
+        "texto": "Sem texto disponível"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr040",
+    "nome": "Noah",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Bárbara",
+    "telefone": "(19) 99907-1591",
+    "whatsapp": "(19) 99907-1591",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contexto limitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2025-10-29",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2025-10-29",
+        "tipo": "nota",
+        "texto": "Apenas áudio"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr041",
+    "nome": "Dante",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Aline",
+    "telefone": "(19) 99199-1486",
+    "whatsapp": "(19) 99199-1486",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contexto limitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-07",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-07",
+        "tipo": "nota",
+        "texto": "Mensagem mínima"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr042",
+    "nome": "Filho(a) de Patrícia",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Patrícia",
+    "telefone": "(19) 98272-1343",
+    "whatsapp": "(19) 98272-1343",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-07",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-07",
+        "tipo": "nota",
+        "texto": "Só recebeu divulgação do treinamento Mamães Sem Culpa, sem resposta"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr043",
+    "nome": "Filho(a) de Mirela",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Mirela",
+    "telefone": "(19) 98404-5647",
+    "whatsapp": "(19) 98404-5647",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-07",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-07",
+        "tipo": "nota",
+        "texto": "Só recebeu divulgação do treinamento Mamães Sem Culpa, sem resposta"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr044",
+    "nome": "Gael",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Mãe do Gael",
+    "telefone": "(19) 99660-4179",
+    "whatsapp": "(19) 99660-4179",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-07",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-07",
+        "tipo": "nota",
+        "texto": "Só recebeu divulgação do treinamento Mamães Sem Culpa, sem resposta"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr045",
+    "nome": "Filho(a) de Jennifer",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Jennifer",
+    "telefone": "(19) 99857-2666",
+    "whatsapp": "(19) 99857-2666",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-07",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-07",
+        "tipo": "nota",
+        "texto": "Só recebeu divulgação do treinamento Mamães Sem Culpa, sem resposta"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr046",
+    "nome": "Daniel",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Jaqueline",
+    "telefone": "(19) 98867-1658",
+    "whatsapp": "(19) 98867-1658",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-07",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-07",
+        "tipo": "nota",
+        "texto": "Só recebeu divulgação do treinamento Mamães Sem Culpa, sem resposta"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr047",
+    "nome": "Sofia",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Jaqueline",
+    "telefone": "(19) 98815-8515",
+    "whatsapp": "(19) 98815-8515",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-07",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-07",
+        "tipo": "nota",
+        "texto": "Só recebeu divulgação do treinamento Mamães Sem Culpa, sem resposta"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr048",
+    "nome": "Giovana",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Isabela",
+    "telefone": "(19) 98460-6010",
+    "whatsapp": "(19) 98460-6010",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-07",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-07",
+        "tipo": "nota",
+        "texto": "Só recebeu divulgação do treinamento Mamães Sem Culpa, sem resposta"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr049",
+    "nome": "Filho(a) de Divani",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Divani",
+    "telefone": "(19) 99699-8718",
+    "whatsapp": "(19) 99699-8718",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-02",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-02",
+        "tipo": "nota",
+        "texto": "Apenas 1 áudio, sem resposta"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr050",
+    "nome": "Cecília",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Caroline",
+    "telefone": "(19) 99770-0765",
+    "whatsapp": "(19) 99770-0765",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-07",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-07",
+        "tipo": "nota",
+        "texto": "Só recebeu divulgação do treinamento Mamães Sem Culpa, sem resposta"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr051",
+    "nome": "Bento",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Camila",
+    "telefone": "(11) 97557-5441",
+    "whatsapp": "(11) 97557-5441",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-07",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-07",
+        "tipo": "nota",
+        "texto": "Só recebeu divulgação do treinamento Mamães Sem Culpa, sem resposta"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr052",
+    "nome": "Rebeca",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Camila",
+    "telefone": "(19) 97422-3016",
+    "whatsapp": "(19) 97422-3016",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-07",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-07",
+        "tipo": "nota",
+        "texto": "Só recebeu divulgação do treinamento Mamães Sem Culpa, sem resposta"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr053",
+    "nome": "Filho(a) de Julya",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Julya",
+    "telefone": "(19) 99108-3082",
+    "whatsapp": "(19) 99108-3082",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr054",
+    "nome": "Filho(a) de Aline",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Aline",
+    "telefone": "(19) 98985-0504",
+    "whatsapp": "(19) 98985-0504",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr055",
+    "nome": "Elisa",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Karla",
+    "telefone": "(19) 99317-0075",
+    "whatsapp": "(19) 99317-0075",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr056",
+    "nome": "Miguel",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Joselia",
+    "telefone": "(19) 99288-6348",
+    "whatsapp": "(19) 99288-6348",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr057",
+    "nome": "Théo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Daiane",
+    "telefone": "(19) 98239-0475",
+    "whatsapp": "(19) 98239-0475",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr058",
+    "nome": "Maria Laura",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Duda",
+    "telefone": "(94) 9287-1990",
+    "whatsapp": "(94) 9287-1990",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr059",
+    "nome": "Alice",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Mayara",
+    "telefone": "(19) 98714-0792",
+    "whatsapp": "(19) 98714-0792",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr060",
+    "nome": "Antonella",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Ana",
+    "telefone": "(49) 9979-2717",
+    "whatsapp": "(49) 9979-2717",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr061",
+    "nome": "Lorenzo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Tatiane",
+    "telefone": "(19) 99710-0925",
+    "whatsapp": "(19) 99710-0925",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr062",
+    "nome": "Gael",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Marcia",
+    "telefone": "(19) 99304-9033",
+    "whatsapp": "(19) 99304-9033",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr063",
+    "nome": "Murilo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Dani",
+    "telefone": "(19) 99717-6670",
+    "whatsapp": "(19) 99717-6670",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr064",
+    "nome": "Bernardo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Thayná",
+    "telefone": "(19) 98710-2855",
+    "whatsapp": "(19) 98710-2855",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr065",
+    "nome": "Arthur",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Aline",
+    "telefone": "(19) 98719-6140",
+    "whatsapp": "(19) 98719-6140",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr066",
+    "nome": "Pablo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Vera",
+    "telefone": "(19) 98950-1785",
+    "whatsapp": "(19) 98950-1785",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr067",
+    "nome": "Thata",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Carla",
+    "telefone": "(19) 99100-4621",
+    "whatsapp": "(19) 99100-4621",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr068",
+    "nome": "Lara",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Jessica",
+    "telefone": "(24) 98132-4030",
+    "whatsapp": "(24) 98132-4030",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr069",
+    "nome": "Bernardo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Lais",
+    "telefone": "(19) 99671-5120",
+    "whatsapp": "(19) 99671-5120",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr070",
+    "nome": "Filho(a) de Lidiane",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Lidiane",
+    "telefone": "(19) 97159-2417",
+    "whatsapp": "(19) 97159-2417",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada (contato salvo como 'Paciente')"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr071",
+    "nome": "Heitor",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Taynan",
+    "telefone": "(79) 9651-4575",
+    "whatsapp": "(79) 9651-4575",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr072",
+    "nome": "Arthur",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Michelle",
+    "telefone": "(47) 9667-2306",
+    "whatsapp": "(47) 9667-2306",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr073",
+    "nome": "Filho(a) de Vanessa",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Vanessa",
+    "telefone": "(19) 99267-1280",
+    "whatsapp": "(19) 99267-1280",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr074",
+    "nome": "Mariah",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Juliana",
+    "telefone": "(19) 99966-5022",
+    "whatsapp": "(19) 99966-5022",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr075",
+    "nome": "Ravi",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Gi",
+    "telefone": "(19) 99275-9861",
+    "whatsapp": "(19) 99275-9861",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr076",
+    "nome": "Samuel",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Beatriz",
+    "telefone": "(19) 99005-4004",
+    "whatsapp": "(19) 99005-4004",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr077",
+    "nome": "Matteo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Nathalia",
+    "telefone": "+447432120151",
+    "whatsapp": "+447432120151",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr078",
+    "nome": "Livia",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Carine",
+    "telefone": "(19) 98877-9368",
+    "whatsapp": "(19) 98877-9368",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr079",
+    "nome": "Filho(a) de Michelle",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Michelle",
+    "telefone": "(19) 99896-4165",
+    "whatsapp": "(19) 99896-4165",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr080",
+    "nome": "Arthur",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Clara",
+    "telefone": "(19) 99204-7505",
+    "whatsapp": "(19) 99204-7505",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr081",
+    "nome": "Alice",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Renata",
+    "telefone": "(19) 99317-3378",
+    "whatsapp": "(19) 99317-3378",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr082",
+    "nome": "Bernardo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Camila",
+    "telefone": "+17783024456",
+    "whatsapp": "+17783024456",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr083",
+    "nome": "Maria",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Estela",
+    "telefone": "(19) 99694-5704",
+    "whatsapp": "(19) 99694-5704",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr084",
+    "nome": "Maitê",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Carol",
+    "telefone": "(12) 99148-2416",
+    "whatsapp": "(12) 99148-2416",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr085",
+    "nome": "Isadora",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Ana",
+    "telefone": "(19) 99357-3476",
+    "whatsapp": "(19) 99357-3476",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr086",
+    "nome": "Bernardo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Ana Luiza",
+    "telefone": "(31) 9940-6948",
+    "whatsapp": "(31) 9940-6948",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr087",
+    "nome": "Lizzi",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Talita",
+    "telefone": "(19) 97406-4287",
+    "whatsapp": "(19) 97406-4287",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr088",
+    "nome": "Vini",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Paty",
+    "telefone": "(19) 99340-5914",
+    "whatsapp": "(19) 99340-5914",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr089",
+    "nome": "André",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Letícia",
+    "telefone": "(19) 99201-1086",
+    "whatsapp": "(19) 99201-1086",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr090",
+    "nome": "Jade",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Rebeca",
+    "telefone": "(19) 98711-3606",
+    "whatsapp": "(19) 98711-3606",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr091",
+    "nome": "Bianca",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Renata",
+    "telefone": "(31) 8624-4444",
+    "whatsapp": "(31) 8624-4444",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr092",
+    "nome": "Alice",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Katia",
+    "telefone": "(19) 99380-9907",
+    "whatsapp": "(19) 99380-9907",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr093",
+    "nome": "Liz",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Glauciele",
+    "telefone": "(19) 99894-8200",
+    "whatsapp": "(19) 99894-8200",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr094",
+    "nome": "Cecília",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Jennyfer",
+    "telefone": "(19) 99549-7731",
+    "whatsapp": "(19) 99549-7731",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr095",
+    "nome": "Leo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Fe",
+    "telefone": "(19) 99651-1101",
+    "whatsapp": "(19) 99651-1101",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr096",
+    "nome": "Maya Sophia",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Brenda",
+    "telefone": "(61) 9108-1395",
+    "whatsapp": "(61) 9108-1395",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr097",
+    "nome": "Joaquim",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Mariana",
+    "telefone": "(18) 99691-1012",
+    "whatsapp": "(18) 99691-1012",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr098",
+    "nome": "Serena",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Larissa",
+    "telefone": "(19) 98768-1477",
+    "whatsapp": "(19) 98768-1477",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr099",
+    "nome": "Matteo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Bianca",
+    "telefone": "(19) 99225-4493",
+    "whatsapp": "(19) 99225-4493",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr100",
+    "nome": "Celina",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Bianca",
+    "telefone": "(11) 96464-6154",
+    "whatsapp": "(11) 96464-6154",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Não fechou"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada"
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr101",
+    "nome": "Filho(a) de Marilia",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Marilia",
+    "telefone": "(19) 99131-4208",
+    "whatsapp": "(19) 99131-4208",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Proposta enviada - aguardando confirmação"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-07-11",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-11",
+        "tipo": "nota",
+        "texto": "Avaliação inicial realizada e link de pagamento enviado; sem confirmação de fechamento."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr102",
+    "nome": "Daniel",
+    "dataNascimento": "2018-07-11",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Maria Amália",
+    "telefone": "(19) 98290-2408",
+    "whatsapp": "(19) 98290-2408",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Proposta enviada - aguardando decisão"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-07-11",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-11",
+        "tipo": "nota",
+        "texto": "Proposta de acompanhamento de 4 meses (9 consultas) enviada; sem confirmação de fechamento."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr103",
+    "nome": "Arthur",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Daiane",
+    "telefone": "(11) 98089-2834",
+    "whatsapp": "(11) 98089-2834",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Link de pagamento enviado - aguardando confirmação"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-07-09",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-09",
+        "tipo": "nota",
+        "texto": "Link de pagamento parcelado enviado; sem confirmação de fechamento."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr104",
+    "nome": "Isadora",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Jheovanna",
+    "telefone": "(19) 98975-5631",
+    "whatsapp": "(19) 98975-5631",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Perdida - estorno solicitado",
+      "Disputa: estorno solicitado"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-07-04",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-04",
+        "tipo": "nota",
+        "texto": "Pagamento realizado, porém cliente solicitou estorno bancário alegando serviço não entregue; situação em disputa, necessita acompanhamento."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr105",
+    "nome": "Valentim",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Camila",
+    "telefone": "(19) 98207-2952",
+    "whatsapp": "(19) 98207-2952",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Consulta realizada - aguardando confirmação"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-03-12",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-03-12",
+        "tipo": "nota",
+        "texto": "Consulta presencial realizada; sem confirmação de fechamento do acompanhamento."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr106",
+    "nome": "Maya",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Luara",
+    "telefone": "(61) 99600-8055",
+    "whatsapp": "(61) 99600-8055",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Perdida - sem retorno"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-08",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-08",
+        "tipo": "nota",
+        "texto": "Enviou apenas um áudio; sem resposta desde então."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr107",
+    "nome": "Filho(a) de Luri",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Luri",
+    "telefone": "(19) 99191-9065",
+    "whatsapp": "(19) 99191-9065",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Perdida - sem engajamento"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-02-07",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-02-07",
+        "tipo": "nota",
+        "texto": "Recebeu apenas divulgação do treinamento (Mamães Sem Culpa); resposta automática, sem retorno."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr108",
+    "nome": "João Guilherme",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Carol",
+    "telefone": "(19) 98122-3556",
+    "whatsapp": "(19) 98122-3556",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Perdida - sem retorno"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2025-11-24",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2025-11-24",
+        "tipo": "nota",
+        "texto": "Atividade prática presencial foi agendada; sem resposta/confirmação desde então."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr109",
+    "nome": "Matheus",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Francieli",
+    "telefone": "(19) 98993-7396",
+    "whatsapp": "(19) 98993-7396",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial",
+      "Irmão(ã): Bianca"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr110",
+    "nome": "Bianca",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Francieli",
+    "telefone": "(19) 98993-7396",
+    "whatsapp": "(19) 98993-7396",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial",
+      "Irmão(ã): Matheus"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr111",
+    "nome": "Isis",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Carolaine",
+    "telefone": "(19) 98906-3541",
+    "whatsapp": "(19) 98906-3541",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr112",
+    "nome": "Lavínia",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Pamela",
+    "telefone": "(19) 99563-9951",
+    "whatsapp": "(19) 99563-9951",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial",
+      "Irmão(ã): Joaquim"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr113",
+    "nome": "Joaquim",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Pamela",
+    "telefone": "(19) 99563-9951",
+    "whatsapp": "(19) 99563-9951",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial",
+      "Irmão(ã): Lavínia"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr114",
+    "nome": "Filho(a) de Gesiane",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Gesiane",
+    "telefone": "(19) 99219-2433",
+    "whatsapp": "(19) 99219-2433",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr115",
+    "nome": "Bia",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Lucelia",
+    "telefone": "(19) 99859-3279",
+    "whatsapp": "(19) 99859-3279",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr116",
+    "nome": "Richard",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Fernanda",
+    "telefone": "(19) 98744-8708",
+    "whatsapp": "(19) 98744-8708",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada; categoria do contato não confirmada."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr117",
+    "nome": "Helena",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Natalí",
+    "telefone": "(19) 98726-2607",
+    "whatsapp": "(19) 98726-2607",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial",
+      "Verificar duplicidade"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada. Possível duplicidade: já existe \"Juliana - Mãe da Helena\" na aba Pacientes (linha 25)."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr118",
+    "nome": "Maitê",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Isabela",
+    "telefone": "(11) 97437-0922",
+    "whatsapp": "(11) 97437-0922",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial",
+      "Verificar duplicidade"
+    ],
+    "status": "prospect",
+    "ultimoContato": "",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-30",
+        "tipo": "nota",
+        "texto": "Contato salvo, sem conversa iniciada. Possível duplicidade: já existe \"Carol - Mãe Da Maitê\" na aba Pacientes (linha 86)."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr119",
+    "nome": "Lolo",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Isabela",
+    "telefone": "(19) 98260-4821",
+    "whatsapp": "(19) 98260-4821",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato inicial",
+      "Verificar duplicidade"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-07-06",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-07-06",
+        "tipo": "nota",
+        "texto": "Possível duplicidade: já existe \"Tamires - Mãe Da Lolo\" na aba Pacientes (linha 32)."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  },
+  {
+    "id": "pr120",
+    "nome": "Be",
+    "dataNascimento": "",
+    "sexo": "F",
+    "escola": "",
+    "diagnostico": "",
+    "alergias": "",
+    "medicamentos": "",
+    "pediatra": "",
+    "responsavel": "Flavia",
+    "telefone": "(32) 9935-9566",
+    "whatsapp": "(32) 9935-9566",
+    "email": "",
+    "endereco": "",
+    "tags": [
+      "Contato pessoal/indicação - vínculo incerto",
+      "Não é lead comercial (indicação pessoal)"
+    ],
+    "status": "prospect",
+    "ultimoContato": "2026-04-09",
+    "pagamentos": [],
+    "evolucao": [],
+    "timeline": [
+      {
+        "data": "2026-04-09",
+        "tipo": "nota",
+        "texto": "Relação pessoal; mencionou nova gravidez e foi encaminhada à colega Elaine para acompanhamento pré-natal. Vínculo comercial com o consultório incerto."
+      }
+    ],
+    "acompanhamento": {
+      "tipo": "Prospecção",
+      "dataInicio": "",
+      "dataFim": "",
+      "consultasTotal": 0,
+      "consultasRealizadas": 0,
+      "valor": 0,
+      "formaPagamento": "Pix",
+      "parcelas": 1,
+      "status": "prospect"
+    }
+  }
 ];
+
+const IMPORTED_EVENTS = [
+  {
+    "id": "ev001",
+    "pacienteId": "rp04",
+    "data": "2026-07-17",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev002",
+    "pacienteId": "rp05",
+    "data": "2026-09-30",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev003",
+    "pacienteId": "rp06",
+    "data": "2026-07-30",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev004",
+    "pacienteId": "rp07",
+    "data": "2026-07-10",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev005",
+    "pacienteId": "rp08",
+    "data": "2026-06-17",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev006",
+    "pacienteId": "rp09",
+    "data": "2026-04-23",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev007",
+    "pacienteId": "rp10",
+    "data": "2026-06-18",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev008",
+    "pacienteId": "rp11",
+    "data": "2026-07-06",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev009",
+    "pacienteId": "rp12",
+    "data": "2026-07-06",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev010",
+    "pacienteId": "rp13",
+    "data": "2026-07-03",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev011",
+    "pacienteId": "rp14",
+    "data": "2026-09-16",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev012",
+    "pacienteId": "rp15",
+    "data": "2026-05-14",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev013",
+    "pacienteId": "rp16",
+    "data": "2026-06-09",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev014",
+    "pacienteId": "rp17",
+    "data": "2026-06-27",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev015",
+    "pacienteId": "rp18",
+    "data": "2026-06-05",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev016",
+    "pacienteId": "rp19",
+    "data": "2026-05-23",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev017",
+    "pacienteId": "rp20",
+    "data": "2026-05-23",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev018",
+    "pacienteId": "rp23",
+    "data": "2026-04-28",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev019",
+    "pacienteId": "rp24",
+    "data": "2026-04-10",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev020",
+    "pacienteId": "rp25",
+    "data": "2026-04-24",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev021",
+    "pacienteId": "rp26",
+    "data": "2026-04-24",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev022",
+    "pacienteId": "rp27",
+    "data": "2025-12-24",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev023",
+    "pacienteId": "rp28",
+    "data": "2025-12-10",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev024",
+    "pacienteId": "rp29",
+    "data": "2026-06-26",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev025",
+    "pacienteId": "rp30",
+    "data": "2026-07-24",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev026",
+    "pacienteId": "rp31",
+    "data": "2026-09-21",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev027",
+    "pacienteId": "rp32",
+    "data": "2026-04-24",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev028",
+    "pacienteId": "rp33",
+    "data": "2026-05-02",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  },
+  {
+    "id": "ev029",
+    "pacienteId": "rp34",
+    "data": "2026-07-07",
+    "hora": "",
+    "tipo": "Retorno",
+    "status": "agendado",
+    "obs": ""
+  }
+];
+
+const IMPORTED_FOLLOWUPS = [
+  {
+    "id": "fu001",
+    "pacienteId": "rp21",
+    "titulo": "Cobrar retorno em atraso — Alice",
+    "tipo": "Cobrar retorno",
+    "prioridade": "alta",
+    "prazo": "2026-08-01",
+    "coluna": "afazer",
+    "responsavel": "Nutricionista"
+  },
+  {
+    "id": "fu002",
+    "pacienteId": "rp27",
+    "titulo": "Cobrar retorno em atraso — Laura (Laurinha)",
+    "tipo": "Cobrar retorno",
+    "prioridade": "alta",
+    "prazo": "2026-08-01",
+    "coluna": "afazer",
+    "responsavel": "Nutricionista"
+  },
+  {
+    "id": "fu003",
+    "pacienteId": "rp33",
+    "titulo": "Cobrar retorno em atraso — Evelin",
+    "tipo": "Cobrar retorno",
+    "prioridade": "alta",
+    "prazo": "2026-08-01",
+    "coluna": "afazer",
+    "responsavel": "Nutricionista"
+  },
+  {
+    "id": "fu004",
+    "pacienteId": "rp34",
+    "titulo": "Cobrar retorno em atraso — Noah",
+    "tipo": "Cobrar retorno",
+    "prioridade": "alta",
+    "prazo": "2026-08-01",
+    "coluna": "afazer",
+    "responsavel": "Nutricionista"
+  }
+];
+
+const seedPatients = () => {
+  const combinados = [...REAL_PATIENTS, ...PROSPECTS];
+  return combinados.map((p) => ({
+    ...p,
+    sessoes: p.sessoes || [],
+    acompanhamento: p.acompanhamento
+      ? { tipoId: "avulso", ...p.acompanhamento }
+      : p.acompanhamento,
+    pagamentos: gerarPagamentosHistorico(p.acompanhamento)
+  }));
+};
+
+const seedEvents = () => IMPORTED_EVENTS;
+
+const EVENT_TIPOS = ["Consulta", "Retorno", "Avaliação", "Outro"];
+const EVENT_STATUS_LABEL = { agendado: "Agendado", realizado: "Realizado", cancelado: "Cancelado" };
+const EVENT_STATUS_COLOR = { agendado: "#6E6355", realizado: "#918567", cancelado: "#A99790" };
+
+const seedFollowups = () => IMPORTED_FOLLOWUPS;
+
+/* ---------------------------------------------------------
+   Tipos de acompanhamento oferecidos pela Bárbara — cada um
+   com suas etapas reais de consulta, usados na aba "Consultas"
+   e no cálculo automático de duração/prazo do plano.
+--------------------------------------------------------- */
+const TIPOS_ACOMPANHAMENTO = [
+  {
+    id: "introducao_alimentar",
+    label: "Introdução Alimentar",
+    faixaEtaria: "a partir de 6 meses",
+    duracaoMeses: 6,
+    descricao: "Acompanhamento da introdução alimentar até 1 ano, com consultas por marcos de idade.",
+    etapas: [
+      { titulo: "Consulta preparatória", descricao: "A mãe aprende como começar a introdução alimentar e tira todas as dúvidas.", offsetMeses: 0 },
+      { titulo: "Consulta prática de introdução alimentar", descricao: "Consulta prática no dia do início da introdução alimentar.", offsetMeses: 0 },
+      { titulo: "Consulta prática de 9 meses", descricao: "Acompanhamento prático quando a criança completa 9 meses.", offsetMeses: 3 },
+      { titulo: "Consulta de 1 ano — recusa alimentar", descricao: "Consulta sobre recusa alimentar quando a criança completa 1 ano.", offsetMeses: 6 }
+    ]
+  },
+  {
+    id: "seletividade",
+    label: "Seletividade Alimentar",
+    faixaEtaria: "1 a 3 anos",
+    duracaoMeses: 4,
+    descricao: "Encontros mensais para a criança recuperar o prazer em comer.",
+    etapas: [
+      { titulo: "Avaliação e plano de ação", descricao: "Levantamento da rotina, histórico e momento de refeição da criança; entrega do plano de ação para a família executar.", offsetMeses: 0 },
+      { titulo: "Acompanhamento do plano de ação", descricao: "Observação do momento de refeição após 1 mês de execução do plano; ajustes de estratégia.", offsetMeses: 1 },
+      { titulo: "Atividade prática 1", descricao: "Atividade prática para aproximar a criança do alimento que ainda não aceita bem.", offsetMeses: 2 },
+      { titulo: "Atividade prática 2", descricao: "Nova atividade prática de aproximação alimentar.", offsetMeses: 3 }
+    ]
+  },
+  {
+    id: "trilhar",
+    label: "Trilhar",
+    faixaEtaria: "4 a 10 anos (pode ter exceções)",
+    duracaoMeses: 6,
+    descricao: "Encontros quinzenais (presencial e online alternados) para trabalhar hábitos alimentares. Duração varia conforme os hábitos a desenvolver.",
+    etapas: [
+      { titulo: "Avaliação inicial (fechamento)", descricao: "Avaliação dos hábitos a trabalhar — é quando a família fecha o acompanhamento.", offsetMeses: 0 },
+      { titulo: "Encontro presencial — atividade prática", descricao: "Trabalho do hábito em forma de atividade prática com a criança.", offsetMeses: 0.5 },
+      { titulo: "Encontro online — acompanhamento", descricao: "Acompanhamento de como estão as atividades enviadas para casa.", offsetMeses: 1 }
+    ]
+  },
+  {
+    id: "avulso",
+    label: "Consulta avulsa / outro",
+    faixaEtaria: "",
+    duracaoMeses: 1,
+    descricao: "Atendimento pontual ou personalizado, fora dos programas padrão.",
+    etapas: []
+  }
+];
+const DURACAO_MINIMA_MESES = 1;
+
+
 
 const KANBAN_COLS = [
   { id: "afazer", label: "A fazer" },
@@ -230,18 +6835,22 @@ const KANBAN_COLS = [
   { id: "concluido", label: "Concluído" }
 ];
 
-const STATUS_LABEL = { ativo: "Ativo", pausa: "Em pausa", concluido: "Concluído" };
-const STATUS_COLOR = { ativo: "#7FAE86", pausa: "#E8B85E", concluido: "#8C99A6" };
-const PRIORIDADE_COLOR = { alta: "#F2704A", media: "#E8B85E", baixa: "#8FAF9E" };
+const STATUS_LABEL = { ativo: "Ativo", pausa: "Em pausa", concluido: "Concluído", prospect: "Prospecção" };
+const STATUS_COLOR = { ativo: "#918567", pausa: "#AFA998", concluido: "#9C9284", prospect: "#A99790" };
+const PRIORIDADE_COLOR = { alta: "#A99790", media: "#AFA998", baixa: "#CFC7B6" };
 
 /* ---------------------------------------------------------
-   Ícone-assinatura: curva de crescimento
+   Ícone-assinatura: mamadeira com coração
 --------------------------------------------------------- */
 const GrowthMark = ({ size = 28 }) => (
   <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
-    <path d="M3 32 C 10 32, 12 30, 15 24 S 20 8, 26 8 S 33 14, 37 12"
-      stroke="#F2704A" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-    <circle cx="37" cy="12" r="2.5" fill="#F2704A" />
+    <path d="M16 9 Q20 5 24 9" stroke="#867A6E" strokeWidth="2.3" strokeLinecap="round" fill="none" />
+    <path d="M17 9 L17 14 M23 9 L23 14" stroke="#867A6E" strokeWidth="2.3" strokeLinecap="round" fill="none" />
+    <path d="M13 14 H27 V29 Q27 33 23 33 H17 Q13 33 13 29 Z"
+      stroke="#867A6E" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    <path d="M13.5 23 H26.5" stroke="#867A6E" strokeWidth="1.6" strokeLinecap="round" />
+    <path d="M20 28.8c-2.3-1.8-3.8-3.1-3.8-4.8 0-1.2 1-2.2 2.2-2.2.7 0 1.3.3 1.6.9.3-.6.9-.9 1.6-.9 1.2 0 2.2 1 2.2 2.2 0 1.7-1.5 3-3.8 4.8z"
+      fill="#A99790" />
   </svg>
 );
 
@@ -257,6 +6866,7 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [showNewPatient, setShowNewPatient] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [events, setEvents] = useState([]);
 
   useEffect(() => {
     (async () => {
@@ -264,17 +6874,21 @@ export default function App() {
         const res = await window.storage.get("crm-nutri-data", false);
         if (res && res.value) {
           const parsed = JSON.parse(res.value);
-          setPatients(parsed.patients || seedPatients());
-          setFollowups(parsed.followups || []);
+          const p = parsed.patients || seedPatients();
+          setPatients(p);
+          setFollowups(parsed.followups || seedFollowups(p));
+          setEvents(parsed.events || seedEvents(p));
         } else {
           const p = seedPatients();
           setPatients(p);
           setFollowups(seedFollowups(p));
+          setEvents(seedEvents(p));
         }
       } catch (e) {
         const p = seedPatients();
         setPatients(p);
         setFollowups(seedFollowups(p));
+        setEvents(seedEvents(p));
       }
       setLoaded(true);
     })();
@@ -286,14 +6900,14 @@ export default function App() {
       try {
         await window.storage.set(
           "crm-nutri-data",
-          JSON.stringify({ patients, followups }),
+          JSON.stringify({ patients, followups, events }),
           false
         );
       } catch (e) {
         console.error("Falha ao salvar:", e);
       }
     })();
-  }, [patients, followups, loaded]);
+  }, [patients, followups, events, loaded]);
 
   const selectedPatient = useMemo(
     () => patients.find((p) => p.id === selectedId) || null,
@@ -323,10 +6937,127 @@ export default function App() {
     setFollowups((prev) => prev.map((f) => (f.id === id ? { ...f, coluna } : f)));
   };
 
+  const addEvent = (ev) => setEvents((prev) => [{ ...ev, id: uid() }, ...prev]);
+  const updateEvent = (id, patch) =>
+    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+  const deleteEvent = (id) => setEvents((prev) => prev.filter((e) => e.id !== id));
+
+  const registrarConsultaHoje = (id) => {
+    const hoje = new Date().toISOString().slice(0, 10);
+    setPatients((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const acomp = p.acompanhamento
+          ? {
+              ...p.acompanhamento,
+              consultasRealizadas: Math.min(
+                (p.acompanhamento.consultasRealizadas || 0) + 1,
+                p.acompanhamento.consultasTotal || (p.acompanhamento.consultasRealizadas || 0) + 1
+              )
+            }
+          : p.acompanhamento;
+        return {
+          ...p,
+          ultimoContato: hoje,
+          acompanhamento: acomp,
+          timeline: [...(p.timeline || []), { data: hoje, tipo: "consulta", texto: "Consulta registrada rapidamente." }]
+        };
+      })
+    );
+  };
+
+  const addMedicao = (id, medicao) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              evolucao: [...(p.evolucao || []), medicao],
+              timeline: [
+                ...(p.timeline || []),
+                { data: medicao.data, tipo: "nota", texto: `Nova medição: ${medicao.peso}kg / ${medicao.altura}cm.` }
+              ]
+            }
+          : p
+      )
+    );
+  };
+
+  const addPagamento = (id, pagamento) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              pagamentos: [...(p.pagamentos || []), pagamento],
+              timeline: [
+                ...(p.timeline || []),
+                {
+                  data: pagamento.data,
+                  tipo: "nota",
+                  texto: `Pagamento registrado: ${formatMoeda(pagamento.valor)} (${pagamento.formaPagamento}).`
+                }
+              ]
+            }
+          : p
+      )
+    );
+  };
+
+  const addSessao = (id, sessao) => {
+    setPatients((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const acomp = p.acompanhamento
+          ? {
+              ...p.acompanhamento,
+              consultasRealizadas: Math.min(
+                (p.acompanhamento.consultasRealizadas || 0) + 1,
+                p.acompanhamento.consultasTotal || (p.acompanhamento.consultasRealizadas || 0) + 1
+              )
+            }
+          : p.acompanhamento;
+        return {
+          ...p,
+          ultimoContato: sessao.data,
+          acompanhamento: acomp,
+          sessoes: [...(p.sessoes || []), sessao],
+          timeline: [
+            ...(p.timeline || []),
+            { data: sessao.data, tipo: "consulta", texto: `${sessao.titulo} — ${sessao.notas || "sem observações"}` }
+          ]
+        };
+      })
+    );
+  };
+
+  const setTipoAcompanhamento = (id, tipoId) => {
+    setPatients((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const tipoInfo = TIPOS_ACOMPANHAMENTO.find((t) => t.id === tipoId);
+        const dataInicio = p.acompanhamento?.dataInicio || new Date().toISOString().slice(0, 10);
+        const duracao = Math.max(tipoInfo?.duracaoMeses || 1, DURACAO_MINIMA_MESES);
+        const dataFim = addMesesData(dataInicio, duracao);
+        return {
+          ...p,
+          acompanhamento: {
+            ...p.acompanhamento,
+            tipoId,
+            tipo: tipoInfo?.label || "Consulta avulsa",
+            dataInicio,
+            dataFim,
+            consultasTotal: tipoInfo?.etapas?.length || p.acompanhamento?.consultasTotal || 1
+          }
+        };
+      })
+    );
+  };
+
   if (!loaded) {
     return (
       <div style={{ ...styles.root, alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: "#4B615D", fontFamily: "Inter, sans-serif" }}>Carregando…</div>
+        <div style={{ color: "#6E6355", fontFamily: "Lato, sans-serif" }}>Carregando…</div>
       </div>
     );
   }
@@ -334,11 +7065,11 @@ export default function App() {
   return (
     <div style={styles.root}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Lato:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; }
         body { margin: 0; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-thumb { background: #DCD8CC; border-radius: 8px; }
+        ::-webkit-scrollbar-thumb { background: #D8CDBB; border-radius: 8px; }
         button { font-family: inherit; cursor: pointer; }
         input, select, textarea { font-family: inherit; }
 
@@ -369,7 +7100,7 @@ export default function App() {
           .chevron-col { display: none !important; }
           .table-row [data-label]::before {
             content: attr(data-label); display: block; font-size: 10.5px;
-            text-transform: uppercase; letter-spacing: 0.4px; color: #8C99A6; margin-bottom: 1px;
+            text-transform: uppercase; letter-spacing: 0.4px; color: #9C9284; margin-bottom: 1px;
           }
           .drawer { width: 100% !important; max-width: 100% !important; }
           .modal {
@@ -403,7 +7134,7 @@ export default function App() {
       {mobileNavOpen && (
         <div
           onClick={() => setMobileNavOpen(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(22,51,46,0.35)", zIndex: 90 }}
+          style={{ position: "fixed", inset: 0, background: "rgba(134,122,110,0.35)", zIndex: 90 }}
         />
       )}
 
@@ -419,13 +7150,16 @@ export default function App() {
               patients={filteredPatients}
               onOpen={(id) => setSelectedId(id)}
               onNew={() => setShowNewPatient(true)}
+              onQuickConsulta={registrarConsultaHoje}
             />
           )}
-          {view === "agenda" && <Agenda patients={patients} />}
+          {view === "agenda" && (
+            <Agenda patients={patients} events={events} onAdd={addEvent} onUpdate={updateEvent} onDelete={deleteEvent} />
+          )}
           {view === "followups" && (
             <FollowupsBoard followups={followups} patients={patients} onMove={moveFollowup} />
           )}
-          {view === "financeiro" && <Financeiro patients={patients} />}
+          {view === "financeiro" && <Financeiro patients={patients} onAddPagamento={addPagamento} />}
         </div>
       </div>
 
@@ -434,6 +7168,11 @@ export default function App() {
           patient={selectedPatient}
           onClose={() => setSelectedId(null)}
           onUpdate={(patch) => updatePatient(selectedPatient.id, patch)}
+          onQuickConsulta={() => registrarConsultaHoje(selectedPatient.id)}
+          onAddMedicao={(m) => addMedicao(selectedPatient.id, m)}
+          onAddPagamento={(pg) => addPagamento(selectedPatient.id, pg)}
+          onAddSessao={(s) => addSessao(selectedPatient.id, s)}
+          onSetTipoAcompanhamento={(tipoId) => setTipoAcompanhamento(selectedPatient.id, tipoId)}
         />
       )}
 
@@ -467,16 +7206,16 @@ function Sidebar({ view, setView, onNewPatient, mobileOpen, onClose }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <GrowthMark />
           <div>
-            <div style={{ fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, color: "#16332E" }}>
-              Crescer
+            <div style={{ fontFamily: "Playfair Display, serif", fontSize: 17, fontWeight: 600, color: "#867A6E" }}>
+              Bárbara Sales
             </div>
-            <div style={{ fontSize: 11, color: "#8C99A6", letterSpacing: 0.4 }}>Nutrição Pediátrica</div>
+            <div style={{ fontSize: 11, color: "#9C9284", letterSpacing: 0.4 }}>Nutrição Materno-Infantil</div>
           </div>
         </div>
         <button
           className="sidebar-close-btn"
           onClick={onClose}
-          style={{ display: "none", background: "none", border: "none", color: "#4B615D", padding: 4 }}
+          style={{ display: "none", background: "none", border: "none", color: "#6E6355", padding: 4 }}
         >
           <X size={18} />
         </button>
@@ -496,8 +7235,8 @@ function Sidebar({ view, setView, onNewPatient, mobileOpen, onClose }) {
               onClick={() => setView(it.id)}
               style={{
                 ...styles.navItem,
-                background: active ? "#16332E" : "transparent",
-                color: active ? "#FBFBF8" : "#4B615D"
+                background: active ? "#867A6E" : "transparent",
+                color: active ? "#F6F0E7" : "#6E6355"
               }}
             >
               <Icon size={17} />
@@ -508,7 +7247,7 @@ function Sidebar({ view, setView, onNewPatient, mobileOpen, onClose }) {
       </nav>
 
       <div style={styles.sidebarFooter}>
-        Jornada da criança, do primeiro contato à alta.
+        CRN 7168 · Guiando com amor a alimentação, da amamentação ao fim da infância.
       </div>
     </div>
   );
@@ -527,12 +7266,12 @@ function Header({ query, setQuery, onMenuClick }) {
         <button
           className="mobile-menu-btn"
           onClick={onMenuClick}
-          style={{ background: "none", border: "none", color: "#16332E", padding: 4, flexShrink: 0 }}
+          style={{ background: "none", border: "none", color: "#867A6E", padding: 4, flexShrink: 0 }}
         >
           <Menu size={20} />
         </button>
         <div className="header-search" style={{ position: "relative", width: 380, maxWidth: "100%" }}>
-          <Search size={16} style={{ position: "absolute", left: 12, top: 11, color: "#8C99A6" }} />
+          <Search size={16} style={{ position: "absolute", left: 12, top: 11, color: "#9C9284" }} />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -541,7 +7280,7 @@ function Header({ query, setQuery, onMenuClick }) {
           />
         </div>
       </div>
-      <div className="header-date" style={{ fontSize: 13, color: "#8C99A6", textTransform: "capitalize", flexShrink: 0, marginLeft: 12 }}>{hoje}</div>
+      <div className="header-date" style={{ fontSize: 13, color: "#9C9284", textTransform: "capitalize", flexShrink: 0, marginLeft: 12 }}>{hoje}</div>
     </div>
   );
 }
@@ -553,6 +7292,7 @@ function Dashboard({ patients, followups, setView, setSelectedId }) {
   const ativos = patients.filter((p) => p.status === "ativo").length;
   const pausa = patients.filter((p) => p.status === "pausa").length;
   const concluidos = patients.filter((p) => p.status === "concluido").length;
+  const prospeccao = patients.filter((p) => p.status === "prospect").length;
 
   const receitaPrevista = patients.reduce((s, p) => s + (p.acompanhamento?.valor || 0), 0);
   const receitaRecebida = patients.reduce((s, p) => {
@@ -578,32 +7318,48 @@ function Dashboard({ patients, followups, setView, setSelectedId }) {
     return diff >= 0 && diff <= 7;
   });
 
-  const evolucaoPacientes = [
-    { mes: "Mar", pacientes: 18 }, { mes: "Abr", pacientes: 21 },
-    { mes: "Mai", pacientes: 24 }, { mes: "Jun", pacientes: 27 },
-    { mes: "Jul", pacientes: patients.length + 24 }
-  ];
+  // Últimos 5 meses, calculados a partir de dados reais (não fictícios)
+  const hoje0 = new Date();
+  const meses5 = Array.from({ length: 5 }, (_, i) => {
+    const d = new Date(hoje0.getFullYear(), hoje0.getMonth() - (4 - i), 1);
+    return { y: d.getFullYear(), m: d.getMonth(), label: d.toLocaleDateString("pt-BR", { month: "short" }) };
+  });
 
-  const receitaMensal = [
-    { mes: "Mar", valor: 8200 }, { mes: "Abr", valor: 9100 },
-    { mes: "Mai", valor: 10400 }, { mes: "Jun", valor: 11200 },
-    { mes: "Jul", valor: Math.round(receitaRecebida / 1.0) + 6000 }
-  ];
+  const evolucaoPacientes = meses5.map(({ y, m, label }) => ({
+    mes: label.charAt(0).toUpperCase() + label.slice(1),
+    pacientes: patients.filter((p) => {
+      if (!p.ultimoContato) return false;
+      const d = new Date(p.ultimoContato + "T00:00:00");
+      return d.getFullYear() === y && d.getMonth() === m;
+    }).length
+  }));
+
+  const receitaMensal = meses5.map(({ y, m, label }) => ({
+    mes: label.charAt(0).toUpperCase() + label.slice(1),
+    valor: patients.reduce((s, p) => {
+      const doMes = (p.pagamentos || []).filter((pg) => {
+        const d = new Date(pg.data + "T00:00:00");
+        return d.getFullYear() === y && d.getMonth() === m;
+      });
+      return s + doMes.reduce((s2, pg) => s2 + pg.valor, 0);
+    }, 0)
+  }));
 
   return (
     <div>
       <SectionTitle title="Painel" subtitle="Visão geral da clínica em tempo real" />
 
       <div style={styles.cardsGrid} className="cards-grid">
-        <MetricCard label="Pacientes ativos" value={ativos} icon={Users} accent="#7FAE86" />
-        <MetricCard label="Em pausa" value={pausa} icon={Clock} accent="#E8B85E" />
-        <MetricCard label="Concluídos" value={concluidos} icon={CheckSquare} accent="#8C99A6" />
-        <MetricCard label="Follow-ups pendentes" value={followupsPendentes} icon={MessageCircle} accent="#F2704A"
+        <MetricCard label="Pacientes ativos" value={ativos} icon={Users} accent="#918567" />
+        <MetricCard label="Em pausa" value={pausa} icon={Clock} accent="#AFA998" />
+        <MetricCard label="Concluídos" value={concluidos} icon={CheckSquare} accent="#9C9284" />
+        <MetricCard label="Em prospecção" value={prospeccao} icon={MessageCircle} accent="#A99790" />
+        <MetricCard label="Follow-ups pendentes" value={followupsPendentes} icon={MessageCircle} accent="#A99790"
           onClick={() => setView("followups")} />
-        <MetricCard label="Receita prevista" value={formatMoeda(receitaPrevista)} icon={DollarSign} accent="#16332E" />
-        <MetricCard label="Receita recebida" value={formatMoeda(receitaRecebida)} icon={TrendingUp} accent="#7FAE86" />
-        <MetricCard label="Receita pendente" value={formatMoeda(receitaPendente)} icon={AlertTriangle} accent="#E8B85E" />
-        <MetricCard label="Aniversariantes da semana" value={aniversariantes.length} icon={Cake} accent="#F2704A" />
+        <MetricCard label="Receita prevista" value={formatMoeda(receitaPrevista)} icon={DollarSign} accent="#867A6E" />
+        <MetricCard label="Receita recebida" value={formatMoeda(receitaRecebida)} icon={TrendingUp} accent="#918567" />
+        <MetricCard label="Receita pendente" value={formatMoeda(receitaPendente)} icon={AlertTriangle} accent="#AFA998" />
+        <MetricCard label="Aniversariantes da semana" value={aniversariantes.length} icon={Cake} accent="#A99790" />
       </div>
 
       <div style={styles.chartsGrid} className="charts-grid">
@@ -613,15 +7369,15 @@ function Dashboard({ patients, followups, setView, setSelectedId }) {
             <AreaChart data={evolucaoPacientes}>
               <defs>
                 <linearGradient id="grad1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#7FAE86" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#7FAE86" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#918567" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#918567" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#EDEAE0" vertical={false} />
-              <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#8C99A6" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: "#8C99A6" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #EDEAE0", fontSize: 13 }} />
-              <Area type="monotone" dataKey="pacientes" stroke="#7FAE86" fill="url(#grad1)" strokeWidth={2.5} />
+              <CartesianGrid stroke="#E3DACB" vertical={false} />
+              <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#9C9284" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 12, fill: "#9C9284" }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #E3DACB", fontSize: 13 }} />
+              <Area type="monotone" dataKey="pacientes" stroke="#918567" fill="url(#grad1)" strokeWidth={2.5} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -630,12 +7386,12 @@ function Dashboard({ patients, followups, setView, setSelectedId }) {
           <div style={styles.panelTitle}>Receita mensal</div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={receitaMensal}>
-              <CartesianGrid stroke="#EDEAE0" vertical={false} />
-              <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#8C99A6" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: "#8C99A6" }} axisLine={false} tickLine={false}
+              <CartesianGrid stroke="#E3DACB" vertical={false} />
+              <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#9C9284" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 12, fill: "#9C9284" }} axisLine={false} tickLine={false}
                 tickFormatter={(v) => `${v / 1000}k`} />
-              <Tooltip formatter={(v) => formatMoeda(v)} contentStyle={{ borderRadius: 8, border: "1px solid #EDEAE0", fontSize: 13 }} />
-              <Bar dataKey="valor" fill="#16332E" radius={[6, 6, 0, 0]} />
+              <Tooltip formatter={(v) => formatMoeda(v)} contentStyle={{ borderRadius: 8, border: "1px solid #E3DACB", fontSize: 13 }} />
+              <Bar dataKey="valor" fill="#867A6E" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -649,10 +7405,10 @@ function Dashboard({ patients, followups, setView, setSelectedId }) {
           semContato.map((p) => (
             <div key={p.id} style={styles.riskRow} onClick={() => setSelectedId(p.id)}>
               <div>
-                <div style={{ fontWeight: 600, color: "#16332E" }}>{p.nome}</div>
-                <div style={{ fontSize: 12, color: "#8C99A6" }}>{p.diagnostico}</div>
+                <div style={{ fontWeight: 600, color: "#867A6E" }}>{p.nome}</div>
+                <div style={{ fontSize: 12, color: "#9C9284" }}>{p.diagnostico}</div>
               </div>
-              <div style={{ fontSize: 12, color: "#F2704A", fontWeight: 600 }}>
+              <div style={{ fontSize: 12, color: "#A99790", fontWeight: 600 }}>
                 {diasDesde(p.ultimoContato)} dias sem contato
               </div>
             </div>
@@ -681,8 +7437,8 @@ function SectionTitle({ title, subtitle, action }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 20 }}>
       <div>
-        <div style={{ fontFamily: "Fraunces, serif", fontSize: 26, fontWeight: 600, color: "#16332E" }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 13, color: "#8C99A6", marginTop: 2 }}>{subtitle}</div>}
+        <div style={{ fontFamily: "Playfair Display, serif", fontSize: 26, fontWeight: 600, color: "#867A6E" }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 13, color: "#9C9284", marginTop: 2 }}>{subtitle}</div>}
       </div>
       {action}
     </div>
@@ -692,7 +7448,7 @@ function SectionTitle({ title, subtitle, action }) {
 /* ---------------------------------------------------------
    Lista de pacientes
 --------------------------------------------------------- */
-function PatientsList({ patients, onOpen, onNew }) {
+function PatientsList({ patients, onOpen, onNew, onQuickConsulta }) {
   return (
     <div>
       <SectionTitle
@@ -711,23 +7467,38 @@ function PatientsList({ patients, onOpen, onNew }) {
           <div style={{ flex: 1 }}>Responsável</div>
           <div style={{ flex: 1 }}>Status</div>
           <div style={{ flex: 1 }}>Acompanhamento</div>
+          <div style={{ width: 36 }} />
           <div style={{ width: 24 }} />
         </div>
         {patients.map((p) => (
           <div key={p.id} style={styles.tableRow} className="table-row" onClick={() => onOpen(p.id)}>
             <div style={{ flex: 2 }}>
-              <div style={{ fontWeight: 600, color: "#16332E" }}>{p.nome}</div>
-              <div style={{ fontSize: 12, color: "#8C99A6" }}>{calcIdade(p.dataNascimento)}</div>
+              <div style={{ fontWeight: 600, color: "#867A6E" }}>{p.nome}</div>
+              <div style={{ fontSize: 12, color: "#9C9284" }}>{calcIdade(p.dataNascimento)}</div>
             </div>
-            <div style={{ flex: 1.4, fontSize: 13, color: "#4B615D" }} data-label="Diagnóstico">{p.diagnostico}</div>
-            <div style={{ flex: 1, fontSize: 13, color: "#4B615D" }} data-label="Responsável">{p.responsavel}</div>
+            <div style={{ flex: 1.4, fontSize: 13, color: "#6E6355" }} data-label="Diagnóstico">{p.diagnostico}</div>
+            <div style={{ flex: 1, fontSize: 13, color: "#6E6355" }} data-label="Responsável">{p.responsavel}</div>
             <div style={{ flex: 1 }} data-label="Status">
               <StatusPill status={p.status} />
             </div>
-            <div style={{ flex: 1, fontSize: 13, color: "#4B615D" }} data-label="Acompanhamento">
+            <div style={{ flex: 1, fontSize: 13, color: "#6E6355" }} data-label="Acompanhamento">
               {p.acompanhamento?.consultasRealizadas}/{p.acompanhamento?.consultasTotal} · {p.acompanhamento?.tipo}
             </div>
-            <div className="chevron-col" style={{ width: 24, color: "#8C99A6" }}><ChevronRight size={16} /></div>
+            <div style={{ width: 36 }} onClick={(e) => e.stopPropagation()}>
+              {p.status !== "concluido" && p.status !== "prospect" && (
+                <button
+                  title="Registrar consulta hoje"
+                  onClick={() => onQuickConsulta(p.id)}
+                  style={{
+                    background: "#EFE6D8", border: "none", borderRadius: 8, padding: 6,
+                    display: "flex", color: "#918567", cursor: "pointer"
+                  }}
+                >
+                  <CheckCircle2 size={15} />
+                </button>
+              )}
+            </div>
+            <div className="chevron-col" style={{ width: 24, color: "#9C9284" }}><ChevronRight size={16} /></div>
           </div>
         ))}
         {patients.length === 0 && <div style={styles.emptyRow}>Nenhum paciente encontrado para essa busca.</div>}
@@ -750,14 +7521,40 @@ function StatusPill({ status }) {
 /* ---------------------------------------------------------
    Detalhe do paciente
 --------------------------------------------------------- */
-function PatientDetail({ patient, onClose, onUpdate }) {
+function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedicao, onAddPagamento, onAddSessao, onSetTipoAcompanhamento }) {
   const [tab, setTab] = useState("dados");
+  const [showMedicaoForm, setShowMedicaoForm] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+  const [showSessaoForm, setShowSessaoForm] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState(null);
+  const [medicao, setMedicao] = useState({
+    peso: "", altura: "", data: new Date().toISOString().slice(0, 10), obs: ""
+  });
+  const [sessaoForm, setSessaoForm] = useState({
+    titulo: "", data: new Date().toISOString().slice(0, 10), notas: ""
+  });
   const tabs = [
     { id: "dados", label: "Dados", icon: FileText },
     { id: "timeline", label: "Timeline", icon: Clock },
-    { id: "evolucao", label: "Evolução clínica", icon: Activity },
+    { id: "consultas", label: "Consultas", icon: Activity },
     { id: "acompanhamento", label: "Acompanhamento", icon: Stethoscope }
   ];
+
+  const tipoInfo =
+    TIPOS_ACOMPANHAMENTO.find((t) => t.id === patient.acompanhamento?.tipoId) ||
+    TIPOS_ACOMPANHAMENTO.find((t) => t.id === "avulso");
+
+  const etapasComStatus = (tipoInfo.etapas || []).map((etapa) => {
+    const sessao = (patient.sessoes || []).find((s) => s.titulo === etapa.titulo);
+    return {
+      ...etapa,
+      dataPrevista: addMesesData(patient.acompanhamento?.dataInicio, etapa.offsetMeses),
+      feita: !!sessao,
+      sessao
+    };
+  });
+  const etapasPendentes = etapasComStatus.filter((e) => !e.feita).map((e) => e.titulo);
 
   const evolucaoChart = (patient.evolucao || []).map((e) => ({
     data: formatData(e.data).slice(0, 5),
@@ -765,22 +7562,77 @@ function PatientDetail({ patient, onClose, onUpdate }) {
     imc: Number(calcIMC(e.peso, e.altura))
   }));
 
+  const salvarMedicao = () => {
+    if (!medicao.peso || !medicao.altura) return;
+    onAddMedicao({
+      data: medicao.data,
+      peso: Number(medicao.peso),
+      altura: Number(medicao.altura),
+      obs: medicao.obs
+    });
+    setMedicao({ peso: "", altura: "", data: new Date().toISOString().slice(0, 10), obs: "" });
+    setShowMedicaoForm(false);
+  };
+
+  const salvarSessao = () => {
+    if (!sessaoForm.titulo.trim()) return;
+    onAddSessao({ id: uid(), titulo: sessaoForm.titulo, data: sessaoForm.data, notas: sessaoForm.notas });
+    setSessaoForm({ titulo: "", data: new Date().toISOString().slice(0, 10), notas: "" });
+    setShowSessaoForm(false);
+  };
+
+  const iniciarEdicao = () => {
+    setEditForm({
+      nome: patient.nome || "",
+      dataNascimento: patient.dataNascimento || "",
+      sexo: patient.sexo || "F",
+      status: patient.status || "ativo",
+      escola: patient.escola || "",
+      diagnostico: patient.diagnostico || "",
+      alergias: patient.alergias || "",
+      medicamentos: patient.medicamentos || "",
+      pediatra: patient.pediatra || "",
+      responsavel: patient.responsavel || "",
+      telefone: patient.telefone || "",
+      whatsapp: patient.whatsapp || "",
+      email: patient.email || "",
+      endereco: patient.endereco || "",
+      tags: (patient.tags || []).join(", ")
+    });
+    setEditMode(true);
+  };
+
+  const salvarEdicao = () => {
+    if (!editForm.nome.trim()) return;
+    onUpdate({
+      ...editForm,
+      tags: editForm.tags.split(",").map((t) => t.trim()).filter(Boolean)
+    });
+    setEditMode(false);
+  };
+
   return (
+    <>
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.drawer} className="drawer" onClick={(e) => e.stopPropagation()}>
         <div style={styles.drawerHeader} className="drawer-header">
           <div>
-            <div style={{ fontFamily: "Fraunces, serif", fontSize: 22, fontWeight: 600, color: "#16332E" }}>
+            <div style={{ fontFamily: "Playfair Display, serif", fontSize: 22, fontWeight: 600, color: "#867A6E" }}>
               {patient.nome}
             </div>
-            <div style={{ fontSize: 13, color: "#8C99A6", marginTop: 2 }}>
+            <div style={{ fontSize: 13, color: "#9C9284", marginTop: 2 }}>
               {calcIdade(patient.dataNascimento)} · {patient.diagnostico}
             </div>
           </div>
-          <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
+          <div style={{ display: "flex", gap: 6 }}>
+            {tab === "dados" && !editMode && (
+              <button title="Editar dados" style={styles.iconBtn} onClick={iniciarEdicao}><Pencil size={16} /></button>
+            )}
+            <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
+          </div>
         </div>
 
-        <div className="drawer-tabs" style={{ display: "flex", gap: 6, padding: "0 24px", borderBottom: "1px solid #EDEAE0" }}>
+        <div className="drawer-tabs" style={{ display: "flex", gap: 6, padding: "0 24px", borderBottom: "1px solid #E3DACB" }}>
           {tabs.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
@@ -788,8 +7640,8 @@ function PatientDetail({ patient, onClose, onUpdate }) {
               <div key={t.id} onClick={() => setTab(t.id)} style={{
                 display: "flex", alignItems: "center", gap: 6, padding: "10px 12px",
                 fontSize: 13, fontWeight: 600, cursor: "pointer",
-                color: active ? "#16332E" : "#8C99A6",
-                borderBottom: active ? "2px solid #16332E" : "2px solid transparent"
+                color: active ? "#867A6E" : "#9C9284",
+                borderBottom: active ? "2px solid #867A6E" : "2px solid transparent"
               }}>
                 <Icon size={14} /> {t.label}
               </div>
@@ -798,8 +7650,35 @@ function PatientDetail({ patient, onClose, onUpdate }) {
         </div>
 
         <div className="drawer-body" style={{ padding: 24, overflowY: "auto", flex: 1 }}>
-          {tab === "dados" && (
+          {tab === "dados" && !editMode && (
             <div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+                <button onClick={onQuickConsulta} style={styles.secondaryBtn}>
+                  <CheckCircle2 size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Consulta hoje
+                </button>
+                <button onClick={() => setShowMedicaoForm((v) => !v)} style={styles.secondaryBtn}>
+                  <Activity size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Adicionar medição
+                </button>
+                <button onClick={() => setShowPayment(true)} style={styles.secondaryBtn}>
+                  <DollarSign size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Registrar pagamento
+                </button>
+              </div>
+
+              {showMedicaoForm && (
+                <div style={{ ...styles.panel, marginBottom: 18 }}>
+                  <div className="new-patient-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
+                    <Field label="Peso (kg)" type="number" value={medicao.peso} onChange={(v) => setMedicao((m) => ({ ...m, peso: v }))} />
+                    <Field label="Altura (cm)" type="number" value={medicao.altura} onChange={(v) => setMedicao((m) => ({ ...m, altura: v }))} />
+                    <Field label="Data" type="date" value={medicao.data} onChange={(v) => setMedicao((m) => ({ ...m, data: v }))} />
+                  </div>
+                  <Field label="Observação" value={medicao.obs} onChange={(v) => setMedicao((m) => ({ ...m, obs: v }))} full />
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+                    <button style={styles.secondaryBtn} onClick={() => setShowMedicaoForm(false)}>Cancelar</button>
+                    <button style={styles.primaryBtn} onClick={salvarMedicao}>Salvar medição</button>
+                  </div>
+                </div>
+              )}
+
               <InfoGrid items={[
                 ["Data de nascimento", formatData(patient.dataNascimento)],
                 ["Sexo", patient.sexo === "F" ? "Feminino" : "Masculino"],
@@ -827,14 +7706,45 @@ function PatientDetail({ patient, onClose, onUpdate }) {
             </div>
           )}
 
+          {tab === "dados" && editMode && editForm && (
+            <div>
+              <div className="new-patient-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <Field label="Nome da criança" value={editForm.nome} onChange={(v) => setEditForm((f) => ({ ...f, nome: v }))} full />
+                <Field label="Data de nascimento" type="date" value={editForm.dataNascimento} onChange={(v) => setEditForm((f) => ({ ...f, dataNascimento: v }))} />
+                <Field label="Sexo" type="select" options={["F", "M"]} value={editForm.sexo} onChange={(v) => setEditForm((f) => ({ ...f, sexo: v }))} />
+                <Field
+                  label="Status" type="select"
+                  options={Object.values(STATUS_LABEL)}
+                  value={STATUS_LABEL[editForm.status]}
+                  onChange={(label) => setEditForm((f) => ({ ...f, status: Object.keys(STATUS_LABEL).find((k) => STATUS_LABEL[k] === label) }))}
+                />
+                <Field label="Diagnóstico" value={editForm.diagnostico} onChange={(v) => setEditForm((f) => ({ ...f, diagnostico: v }))} full />
+                <Field label="Alergias" value={editForm.alergias} onChange={(v) => setEditForm((f) => ({ ...f, alergias: v }))} />
+                <Field label="Medicamentos" value={editForm.medicamentos} onChange={(v) => setEditForm((f) => ({ ...f, medicamentos: v }))} />
+                <Field label="Escola" value={editForm.escola} onChange={(v) => setEditForm((f) => ({ ...f, escola: v }))} />
+                <Field label="Pediatra" value={editForm.pediatra} onChange={(v) => setEditForm((f) => ({ ...f, pediatra: v }))} />
+                <Field label="Responsável" value={editForm.responsavel} onChange={(v) => setEditForm((f) => ({ ...f, responsavel: v }))} full />
+                <Field label="Telefone" value={editForm.telefone} onChange={(v) => setEditForm((f) => ({ ...f, telefone: maskTelefone(v) }))} />
+                <Field label="WhatsApp" value={editForm.whatsapp} onChange={(v) => setEditForm((f) => ({ ...f, whatsapp: maskTelefone(v) }))} />
+                <Field label="E-mail" value={editForm.email} onChange={(v) => setEditForm((f) => ({ ...f, email: v }))} />
+                <Field label="Endereço" value={editForm.endereco} onChange={(v) => setEditForm((f) => ({ ...f, endereco: v }))} />
+                <Field label="Tags (separadas por vírgula)" value={editForm.tags} onChange={(v) => setEditForm((f) => ({ ...f, tags: v }))} full />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+                <button style={styles.secondaryBtn} onClick={() => setEditMode(false)}>Cancelar</button>
+                <button style={styles.primaryBtn} onClick={salvarEdicao}>Salvar alterações</button>
+              </div>
+            </div>
+          )}
+
           {tab === "timeline" && (
             <div>
               {(patient.timeline || []).slice().reverse().map((ev, i) => (
                 <div key={i} style={styles.timelineItem}>
                   <div style={styles.timelineDot} />
                   <div>
-                    <div style={{ fontSize: 12, color: "#8C99A6" }}>{formatData(ev.data)} · {ev.tipo}</div>
-                    <div style={{ fontSize: 14, color: "#16332E" }}>{ev.texto}</div>
+                    <div style={{ fontSize: 12, color: "#9C9284" }}>{formatData(ev.data)} · {ev.tipo}</div>
+                    <div style={{ fontSize: 14, color: "#867A6E" }}>{ev.texto}</div>
                   </div>
                 </div>
               ))}
@@ -844,25 +7754,128 @@ function PatientDetail({ patient, onClose, onUpdate }) {
             </div>
           )}
 
-          {tab === "evolucao" && (
+          {tab === "consultas" && (
             <div>
-              <ResponsiveContainer width="100%" height={200}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 14 }}>
+                <div>
+                  <div style={styles.miniTitle}>{tipoInfo.label}</div>
+                  {tipoInfo.faixaEtaria && (
+                    <div style={{ fontSize: 12, color: "#9C9284", marginTop: 2 }}>
+                      {tipoInfo.faixaEtaria} · {tipoInfo.duracaoMeses} {tipoInfo.duracaoMeses === 1 ? "mês" : "meses"} de duração · inclui WhatsApp
+                    </div>
+                  )}
+                </div>
+                <button
+                  style={styles.secondaryBtn}
+                  onClick={() => {
+                    setSessaoForm((f) => ({ ...f, titulo: etapasPendentes[0] || "" }));
+                    setShowSessaoForm((v) => !v);
+                  }}
+                >
+                  <CheckCircle2 size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Registrar consulta
+                </button>
+              </div>
+
+              {showSessaoForm && (
+                <div style={{ ...styles.panel, marginBottom: 16 }}>
+                  {tipoInfo.etapas.length > 0 ? (
+                    <Field
+                      label="Etapa realizada" type="select" full
+                      options={etapasPendentes.length ? etapasPendentes : etapasComStatus.map((e) => e.titulo)}
+                      value={sessaoForm.titulo}
+                      onChange={(v) => setSessaoForm((f) => ({ ...f, titulo: v }))}
+                    />
+                  ) : (
+                    <Field
+                      label="O que foi essa consulta" full
+                      value={sessaoForm.titulo}
+                      onChange={(v) => setSessaoForm((f) => ({ ...f, titulo: v }))}
+                    />
+                  )}
+                  <div style={{ marginTop: 12 }}>
+                    <Field label="Data" type="date" value={sessaoForm.data} onChange={(v) => setSessaoForm((f) => ({ ...f, data: v }))} />
+                  </div>
+                  <div style={{ marginTop: 12 }}>
+                    <Field
+                      label="O que foi feito / observações" full
+                      value={sessaoForm.notas}
+                      onChange={(v) => setSessaoForm((f) => ({ ...f, notas: v }))}
+                    />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+                    <button style={styles.secondaryBtn} onClick={() => setShowSessaoForm(false)}>Cancelar</button>
+                    <button style={styles.primaryBtn} onClick={salvarSessao}>Salvar consulta</button>
+                  </div>
+                </div>
+              )}
+
+              {tipoInfo.etapas.length > 0 ? (
+                <div>
+                  {etapasComStatus.map((e, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex", gap: 12, padding: "12px 0",
+                        borderBottom: i < etapasComStatus.length - 1 ? "1px solid #E3DACB" : "none"
+                      }}
+                    >
+                      <div style={{ marginTop: 2, flexShrink: 0 }}>
+                        {e.feita ? <CheckCircle2 size={18} color="#918567" /> : <Clock size={18} color="#CFC7B6" />}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                          <div style={{ fontWeight: 600, color: "#16332E" }}>{e.titulo}</div>
+                          <div style={{ fontSize: 12, color: "#9C9284" }}>
+                            {e.feita ? formatData(e.sessao.data) : `previsto: ${formatData(e.dataPrevista)}`}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 13, color: "#6E6355", marginTop: 2 }}>{e.descricao}</div>
+                        {e.feita && e.sessao.notas && (
+                          <div style={{ fontSize: 13, color: "#4B615D", marginTop: 6, background: "#F6F0E7", padding: "8px 10px", borderRadius: 8 }}>
+                            {e.sessao.notas}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div>
+                  {(!patient.sessoes || patient.sessoes.length === 0) && (
+                    <div style={styles.emptyRow}>Nenhuma consulta registrada ainda.</div>
+                  )}
+                  {(patient.sessoes || []).slice().reverse().map((s) => (
+                    <div key={s.id} style={styles.timelineItem}>
+                      <div style={styles.timelineDot} />
+                      <div>
+                        <div style={{ fontSize: 12, color: "#9C9284" }}>{formatData(s.data)}</div>
+                        <div style={{ fontSize: 14, color: "#16332E", fontWeight: 600 }}>{s.titulo}</div>
+                        {s.notas && <div style={{ fontSize: 13, color: "#6E6355", marginTop: 2 }}>{s.notas}</div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={styles.divider} />
+              <div style={styles.miniTitle}>Evolução de peso e altura</div>
+              <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={evolucaoChart}>
-                  <CartesianGrid stroke="#EDEAE0" vertical={false} />
-                  <XAxis dataKey="data" tick={{ fontSize: 11, fill: "#8C99A6" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "#8C99A6" }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #EDEAE0", fontSize: 12 }} />
-                  <Line type="monotone" dataKey="peso" stroke="#7FAE86" strokeWidth={2.5} dot={{ r: 3 }} name="Peso (kg)" />
+                  <CartesianGrid stroke="#E3DACB" vertical={false} />
+                  <XAxis dataKey="data" tick={{ fontSize: 11, fill: "#9C9284" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: "#9C9284" }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #E3DACB", fontSize: 12 }} />
+                  <Line type="monotone" dataKey="peso" stroke="#918567" strokeWidth={2.5} dot={{ r: 3 }} name="Peso (kg)" />
                 </LineChart>
               </ResponsiveContainer>
               <div style={{ marginTop: 12 }}>
                 {(patient.evolucao || []).slice().reverse().map((e, i) => (
                   <div key={i} style={styles.evoRow} className="evo-row">
-                    <div style={{ fontSize: 12, color: "#8C99A6", width: 90 }}>{formatData(e.data)}</div>
-                    <div style={{ fontSize: 13, color: "#16332E", width: 70 }}>{e.peso} kg</div>
-                    <div style={{ fontSize: 13, color: "#16332E", width: 70 }}>{e.altura} cm</div>
-                    <div style={{ fontSize: 13, color: "#16332E", width: 70 }}>IMC {calcIMC(e.peso, e.altura)}</div>
-                    <div style={{ fontSize: 13, color: "#4B615D", flex: 1 }}>{e.obs}</div>
+                    <div style={{ fontSize: 12, color: "#9C9284", width: 90 }}>{formatData(e.data)}</div>
+                    <div style={{ fontSize: 13, color: "#867A6E", width: 70 }}>{e.peso} kg</div>
+                    <div style={{ fontSize: 13, color: "#867A6E", width: 70 }}>{e.altura} cm</div>
+                    <div style={{ fontSize: 13, color: "#867A6E", width: 70 }}>IMC {calcIMC(e.peso, e.altura)}</div>
+                    <div style={{ fontSize: 13, color: "#6E6355", flex: 1 }}>{e.obs}</div>
                   </div>
                 ))}
               </div>
@@ -871,6 +7884,21 @@ function PatientDetail({ patient, onClose, onUpdate }) {
 
           {tab === "acompanhamento" && patient.acompanhamento && (
             <div>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                  Tipo de acompanhamento
+                </div>
+                <select
+                  value={patient.acompanhamento.tipoId || "avulso"}
+                  onChange={(e) => onSetTipoAcompanhamento(e.target.value)}
+                  style={styles.input}
+                >
+                  {TIPOS_ACOMPANHAMENTO.map((t) => (
+                    <option key={t.id} value={t.id}>{t.label}</option>
+                  ))}
+                </select>
+                <div style={{ fontSize: 12, color: "#9C9284", marginTop: 6 }}>{tipoInfo.descricao}</div>
+              </div>
               <InfoGrid items={[
                 ["Tipo de plano", patient.acompanhamento.tipo],
                 ["Início", formatData(patient.acompanhamento.dataInicio)],
@@ -882,11 +7910,44 @@ function PatientDetail({ patient, onClose, onUpdate }) {
               <div style={styles.divider} />
               <div style={styles.miniTitle}>Status do acompanhamento</div>
               <StatusPill status={patient.status} />
+              <div style={{ marginTop: 14 }}>
+                <button style={styles.primaryBtn} onClick={() => setShowPayment(true)}>
+                  <DollarSign size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Registrar pagamento
+                </button>
+              </div>
+              {patient.pagamentos && patient.pagamentos.length > 0 && (
+                <>
+                  <div style={styles.divider} />
+                  <div style={styles.miniTitle}>Histórico de pagamentos</div>
+                  {patient.pagamentos.slice().reverse().map((pg) => (
+                    <div key={pg.id} style={styles.evoRow} className="evo-row">
+                      <div style={{ fontSize: 12, color: "#9C9284", width: 90 }}>{formatData(pg.data)}</div>
+                      <div style={{ fontSize: 13, color: "#867A6E", fontWeight: 600, width: 100 }}>{formatMoeda(pg.valor)}</div>
+                      <div style={{ fontSize: 13, color: "#6E6355" }}>
+                        {pg.formaPagamento}{pg.tipo === "avulso" ? " · Avulso" : ""}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>
       </div>
     </div>
+
+      {showPayment && (
+        <PaymentModal
+          patients={[patient]}
+          target={{ patientId: patient.id, mode: "parcela" }}
+          onClose={() => setShowPayment(false)}
+          onSave={(patientId, pagamento) => {
+            onAddPagamento(pagamento);
+            setShowPayment(false);
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -895,8 +7956,8 @@ function InfoGrid({ items }) {
     <div className="info-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 20px" }}>
       {items.map(([label, value]) => (
         <div key={label}>
-          <div style={{ fontSize: 11, color: "#8C99A6", textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</div>
-          <div style={{ fontSize: 14, color: "#16332E", marginTop: 2 }}>{value || "-"}</div>
+          <div style={{ fontSize: 11, color: "#9C9284", textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</div>
+          <div style={{ fontSize: 14, color: "#867A6E", marginTop: 2 }}>{value || "-"}</div>
         </div>
       ))}
     </div>
@@ -913,18 +7974,32 @@ function NewPatientModal({ onClose, onSave }) {
     telefone: "", whatsapp: "", email: "", endereco: "", tags: "",
     status: "ativo", ultimoContato: new Date().toISOString().slice(0, 10)
   });
+  const [whatsappIgual, setWhatsappIgual] = useState(true);
+  const [showMais, setShowMais] = useState(false);
+  const [erro, setErro] = useState("");
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  const setTelefone = (v) => {
+    const formatted = maskTelefone(v);
+    setForm((f) => ({ ...f, telefone: formatted, whatsapp: whatsappIgual ? formatted : f.whatsapp }));
+  };
+
   const submit = () => {
-    if (!form.nome.trim()) return;
+    if (!form.nome.trim()) {
+      setErro("Informe o nome da criança para salvar.");
+      return;
+    }
     onSave({
       ...form,
+      whatsapp: whatsappIgual ? form.telefone : form.whatsapp,
       tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
+      pagamentos: [],
       evolucao: [],
+      sessoes: [],
       timeline: [{ data: new Date().toISOString().slice(0, 10), tipo: "nota", texto: "Paciente cadastrado no sistema." }],
       acompanhamento: {
-        tipo: "Consulta avulsa", dataInicio: new Date().toISOString().slice(0, 10),
+        tipoId: "avulso", tipo: "Consulta avulsa", dataInicio: new Date().toISOString().slice(0, 10),
         dataFim: "", consultasTotal: 1, consultasRealizadas: 0, valor: 0,
         formaPagamento: "Pix", parcelas: 1, status: "ativo"
       }
@@ -935,28 +8010,58 @@ function NewPatientModal({ onClose, onSave }) {
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.modal} className="modal" onClick={(e) => e.stopPropagation()}>
         <div style={styles.drawerHeader} className="drawer-header">
-          <div style={{ fontFamily: "Fraunces, serif", fontSize: 20, fontWeight: 600, color: "#16332E" }}>
+          <div style={{ fontFamily: "Playfair Display, serif", fontSize: 20, fontWeight: 600, color: "#867A6E" }}>
             Novo paciente
           </div>
           <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
         <div className="new-patient-grid" style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, overflowY: "auto" }}>
-          <Field label="Nome da criança" value={form.nome} onChange={(v) => set("nome", v)} full />
+          <Field label="Nome da criança *" value={form.nome} onChange={(v) => { set("nome", v); if (erro) setErro(""); }} full error={erro} />
           <Field label="Data de nascimento" type="date" value={form.dataNascimento} onChange={(v) => set("dataNascimento", v)} />
           <Field label="Sexo" type="select" options={["F", "M"]} value={form.sexo} onChange={(v) => set("sexo", v)} />
-          <Field label="Diagnóstico" value={form.diagnostico} onChange={(v) => set("diagnostico", v)} full />
-          <Field label="Alergias" value={form.alergias} onChange={(v) => set("alergias", v)} />
-          <Field label="Medicamentos" value={form.medicamentos} onChange={(v) => set("medicamentos", v)} />
-          <Field label="Escola" value={form.escola} onChange={(v) => set("escola", v)} />
-          <Field label="Pediatra" value={form.pediatra} onChange={(v) => set("pediatra", v)} />
           <Field label="Responsável" value={form.responsavel} onChange={(v) => set("responsavel", v)} full />
-          <Field label="Telefone" value={form.telefone} onChange={(v) => set("telefone", v)} />
-          <Field label="WhatsApp" value={form.whatsapp} onChange={(v) => set("whatsapp", v)} />
-          <Field label="E-mail" value={form.email} onChange={(v) => set("email", v)} />
-          <Field label="Endereço" value={form.endereco} onChange={(v) => set("endereco", v)} />
-          <Field label="Tags (separadas por vírgula)" value={form.tags} onChange={(v) => set("tags", v)} full />
+          <Field label="Telefone / WhatsApp" value={form.telefone} onChange={setTelefone} />
+
+          <div>
+            <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>WhatsApp</div>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#6E6355", marginBottom: 6 }}>
+              <input
+                type="checkbox"
+                checked={whatsappIgual}
+                onChange={(e) => { setWhatsappIgual(e.target.checked); if (e.target.checked) set("whatsapp", form.telefone); }}
+              />
+              Mesmo número
+            </label>
+            {!whatsappIgual && (
+              <input value={form.whatsapp} onChange={(e) => set("whatsapp", maskTelefone(e.target.value))} style={styles.input} />
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowMais((v) => !v)}
+            style={{
+              gridColumn: "1 / -1", background: "none", border: "none", color: "#867A6E",
+              fontSize: 12.5, fontWeight: 600, textAlign: "left", padding: "6px 0", cursor: "pointer"
+            }}
+          >
+            {showMais ? "− Ocultar detalhes clínicos e de contato" : "+ Adicionar detalhes clínicos e de contato"}
+          </button>
+
+          {showMais && (
+            <>
+              <Field label="Diagnóstico" value={form.diagnostico} onChange={(v) => set("diagnostico", v)} full />
+              <Field label="Alergias" value={form.alergias} onChange={(v) => set("alergias", v)} />
+              <Field label="Medicamentos" value={form.medicamentos} onChange={(v) => set("medicamentos", v)} />
+              <Field label="Escola" value={form.escola} onChange={(v) => set("escola", v)} />
+              <Field label="Pediatra" value={form.pediatra} onChange={(v) => set("pediatra", v)} />
+              <Field label="E-mail" value={form.email} onChange={(v) => set("email", v)} />
+              <Field label="Endereço" value={form.endereco} onChange={(v) => set("endereco", v)} />
+              <Field label="Tags (separadas por vírgula)" value={form.tags} onChange={(v) => set("tags", v)} full />
+            </>
+          )}
         </div>
-        <div className="modal-footer" style={{ padding: "16px 24px", borderTop: "1px solid #EDEAE0", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+        <div className="modal-footer" style={{ padding: "16px 24px", borderTop: "1px solid #E3DACB", display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <button style={styles.secondaryBtn} onClick={onClose}>Cancelar</button>
           <button style={styles.primaryBtn} onClick={submit}>Salvar paciente</button>
         </div>
@@ -965,17 +8070,23 @@ function NewPatientModal({ onClose, onSave }) {
   );
 }
 
-function Field({ label, value, onChange, type = "text", options, full }) {
+function Field({ label, value, onChange, type = "text", options, full, error }) {
   return (
     <div style={{ gridColumn: full ? "1 / -1" : "auto" }}>
-      <div style={{ fontSize: 11, color: "#8C99A6", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</div>
+      <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</div>
       {type === "select" ? (
         <select value={value} onChange={(e) => onChange(e.target.value)} style={styles.input}>
           {options.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
       ) : (
-        <input type={type} value={value} onChange={(e) => onChange(e.target.value)} style={styles.input} />
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ ...styles.input, ...(error ? { border: "1px solid #A99790" } : {}) }}
+        />
       )}
+      {error && <div style={{ fontSize: 11.5, color: "#A99790", marginTop: 4 }}>{error}</div>}
     </div>
   );
 }
@@ -983,18 +8094,14 @@ function Field({ label, value, onChange, type = "text", options, full }) {
 /* ---------------------------------------------------------
    Agenda
 --------------------------------------------------------- */
-function Agenda({ patients }) {
-  const eventos = patients
-    .filter((p) => p.acompanhamento?.dataFim)
-    .map((p) => ({
-      nome: p.nome,
-      data: p.acompanhamento.dataInicio,
-      tipo: "Retorno agendado",
-      status: p.status
-    }))
-    .sort((a, b) => new Date(a.data) - new Date(b.data));
+function Agenda({ patients, events, onAdd, onUpdate, onDelete }) {
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState(null);
 
-  const porData = eventos.reduce((acc, e) => {
+  const patientName = (id) => patients.find((p) => p.id === id)?.nome || "—";
+
+  const ordenados = [...events].sort((a, b) => (a.data + (a.hora || "")).localeCompare(b.data + (b.hora || "")));
+  const porData = ordenados.reduce((acc, e) => {
     acc[e.data] = acc[e.data] || [];
     acc[e.data].push(e);
     return acc;
@@ -1002,24 +8109,130 @@ function Agenda({ patients }) {
 
   return (
     <div>
-      <SectionTitle title="Agenda" subtitle="Consultas e retornos por data" />
+      <SectionTitle
+        title="Agenda"
+        subtitle="Consultas e retornos por data"
+        action={
+          <button style={styles.primaryBtn} onClick={() => { setEditing(null); setShowModal(true); }}>
+            <Plus size={16} /> Novo agendamento
+          </button>
+        }
+      />
       <div style={styles.panel}>
         {Object.keys(porData).length === 0 && <div style={styles.emptyRow}>Nenhum evento agendado.</div>}
         {Object.entries(porData).map(([data, lista]) => (
           <div key={data} style={{ marginBottom: 18 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#16332E", marginBottom: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#867A6E", marginBottom: 8 }}>
               {new Date(data + "T00:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
             </div>
-            {lista.map((e, i) => (
-              <div key={i} style={styles.agendaRow} className="agenda-row">
-                <Calendar size={15} color="#7FAE86" />
-                <div className="agenda-name" style={{ fontWeight: 600, color: "#16332E", width: 180 }}>{e.nome}</div>
-                <div style={{ fontSize: 13, color: "#4B615D" }}>{e.tipo}</div>
-                <StatusPill status={e.status} />
+            {lista.map((e) => (
+              <div key={e.id} style={styles.agendaRow} className="agenda-row">
+                <Calendar size={15} color={EVENT_STATUS_COLOR[e.status]} />
+                <div className="agenda-name" style={{ fontWeight: 600, color: "#867A6E", width: 180 }}>
+                  {patientName(e.pacienteId)}
+                  {e.hora && <span style={{ color: "#9C9284", fontWeight: 400 }}> · {e.hora}</span>}
+                </div>
+                <div style={{ fontSize: 13, color: "#6E6355" }}>{e.tipo}</div>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20,
+                  background: EVENT_STATUS_COLOR[e.status] + "1F", color: EVENT_STATUS_COLOR[e.status]
+                }}>
+                  {EVENT_STATUS_LABEL[e.status]}
+                </span>
+                <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
+                  {e.status === "agendado" && (
+                    <button
+                      title="Marcar como realizado"
+                      onClick={() => onUpdate(e.id, { status: "realizado" })}
+                      style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#918567", cursor: "pointer" }}
+                    >
+                      <CheckCircle2 size={13} />
+                    </button>
+                  )}
+                  <button
+                    title="Editar"
+                    onClick={() => { setEditing(e); setShowModal(true); }}
+                    style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#6E6355", cursor: "pointer" }}
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    title="Excluir"
+                    onClick={() => { if (window.confirm("Excluir este agendamento? Essa ação não pode ser desfeita.")) onDelete(e.id); }}
+                    style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#A99790", cursor: "pointer" }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         ))}
+      </div>
+
+      {showModal && (
+        <EventModal
+          patients={patients}
+          event={editing}
+          onClose={() => setShowModal(false)}
+          onSave={(ev) => {
+            if (editing) onUpdate(editing.id, ev);
+            else onAdd(ev);
+            setShowModal(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function EventModal({ patients, event, onClose, onSave }) {
+  const [form, setForm] = useState({
+    pacienteId: event?.pacienteId || patients[0]?.id || "",
+    data: event?.data || new Date().toISOString().slice(0, 10),
+    hora: event?.hora || "09:00",
+    tipo: event?.tipo || "Consulta",
+    status: event?.status || "agendado",
+    obs: event?.obs || ""
+  });
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const submit = () => {
+    if (!form.pacienteId || !form.data) return;
+    onSave(form);
+  };
+
+  return (
+    <div style={styles.overlay} onClick={onClose}>
+      <div style={{ ...styles.modal, width: 460 }} className="modal" onClick={(e) => e.stopPropagation()}>
+        <div style={styles.drawerHeader} className="drawer-header">
+          <div style={{ fontFamily: "Playfair Display, serif", fontSize: 18, fontWeight: 600, color: "#867A6E" }}>
+            {event ? "Editar agendamento" : "Novo agendamento"}
+          </div>
+          <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="new-patient-grid" style={{ padding: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field
+            label="Paciente" type="select" full
+            options={patients.map((p) => p.nome)}
+            value={patients.find((p) => p.id === form.pacienteId)?.nome || ""}
+            onChange={(nome) => set("pacienteId", patients.find((p) => p.nome === nome)?.id)}
+          />
+          <Field label="Data" type="date" value={form.data} onChange={(v) => set("data", v)} />
+          <Field label="Hora" type="time" value={form.hora} onChange={(v) => set("hora", v)} />
+          <Field label="Tipo" type="select" options={EVENT_TIPOS} value={form.tipo} onChange={(v) => set("tipo", v)} />
+          <Field
+            label="Status" type="select"
+            options={Object.values(EVENT_STATUS_LABEL)}
+            value={EVENT_STATUS_LABEL[form.status]}
+            onChange={(label) => set("status", Object.keys(EVENT_STATUS_LABEL).find((k) => EVENT_STATUS_LABEL[k] === label))}
+          />
+          <Field label="Observações" value={form.obs} onChange={(v) => set("obs", v)} full />
+        </div>
+        <div className="modal-footer" style={{ padding: "16px 20px", borderTop: "1px solid #E3DACB", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button style={styles.secondaryBtn} onClick={onClose}>Cancelar</button>
+          <button style={styles.primaryBtn} onClick={submit}>Salvar</button>
+        </div>
       </div>
     </div>
   );
@@ -1040,17 +8253,17 @@ function FollowupsBoard({ followups, patients, onMove }) {
           return (
             <div key={col.id} style={styles.kanbanCol} className="kanban-col">
               <div style={styles.kanbanColHeader}>
-                {col.label} <span style={{ color: "#8C99A6", fontWeight: 400 }}>({items.length})</span>
+                {col.label} <span style={{ color: "#9C9284", fontWeight: 400 }}>({items.length})</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {items.map((f) => (
                   <div key={f.id} style={styles.kanbanCard}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#16332E" }}>{f.titulo}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#867A6E" }}>{f.titulo}</div>
                       <span style={{ width: 8, height: 8, borderRadius: 8, background: PRIORIDADE_COLOR[f.prioridade], marginTop: 4 }} />
                     </div>
-                    <div style={{ fontSize: 12, color: "#8C99A6", marginTop: 4 }}>{patientName(f.pacienteId)}</div>
-                    <div style={{ fontSize: 11, color: "#8C99A6", marginTop: 6 }}>
+                    <div style={{ fontSize: 12, color: "#9C9284", marginTop: 4 }}>{patientName(f.pacienteId)}</div>
+                    <div style={{ fontSize: 11, color: "#9C9284", marginTop: 6 }}>
                       Prazo {formatData(f.prazo)} · {f.responsavel}
                     </div>
                     <select
@@ -1062,7 +8275,7 @@ function FollowupsBoard({ followups, patients, onMove }) {
                     </select>
                   </div>
                 ))}
-                {items.length === 0 && <div style={{ fontSize: 12, color: "#C4C0B4", padding: "8px 0" }}>Sem tarefas</div>}
+                {items.length === 0 && <div style={{ fontSize: 12, color: "#C9BFAE", padding: "8px 0" }}>Sem tarefas</div>}
               </div>
             </div>
           );
@@ -1075,24 +8288,45 @@ function FollowupsBoard({ followups, patients, onMove }) {
 /* ---------------------------------------------------------
    Financeiro
 --------------------------------------------------------- */
-function Financeiro({ patients }) {
-  const rows = patients.map((p) => {
-    const a = p.acompanhamento || {};
-    const recebido = a.consultasTotal ? (a.valor / a.consultasTotal) * a.consultasRealizadas : 0;
-    return { ...p, recebido, pendente: (a.valor || 0) - recebido };
+function Financeiro({ patients, onAddPagamento }) {
+  const [paymentTarget, setPaymentTarget] = useState(null);
+
+  const rows = patients.filter((p) => p.status !== "prospect").map((p) => {
+    const pagamentos = p.pagamentos || [];
+    const recebidoPlano = pagamentos.filter((pg) => pg.tipo !== "avulso").reduce((s, pg) => s + pg.valor, 0);
+    const recebidoAvulso = pagamentos.filter((pg) => pg.tipo === "avulso").reduce((s, pg) => s + pg.valor, 0);
+    const previsto = p.acompanhamento?.valor || 0;
+    const pendente = Math.max(0, previsto - recebidoPlano);
+    return { ...p, recebidoPlano, recebidoAvulso, recebidoTotal: recebidoPlano + recebidoAvulso, pendente };
   });
 
   const totalPrevisto = rows.reduce((s, r) => s + (r.acompanhamento?.valor || 0), 0);
-  const totalRecebido = rows.reduce((s, r) => s + r.recebido, 0);
-  const totalPendente = totalPrevisto - totalRecebido;
+  const totalRecebido = rows.reduce((s, r) => s + r.recebidoTotal, 0);
+  const totalPendente = rows.reduce((s, r) => s + r.pendente, 0);
+
+  const todosPagamentos = rows
+    .flatMap((r) => (r.pagamentos || []).map((pg) => ({ ...pg, pacienteNome: r.nome })))
+    .sort((a, b) => new Date(b.data) - new Date(a.data))
+    .slice(0, 8);
 
   return (
     <div>
-      <SectionTitle title="Financeiro" subtitle="Planos, pagamentos e inadimplência" />
+      <SectionTitle
+        title="Financeiro"
+        subtitle="Planos, pagamentos e inadimplência"
+        action={
+          <button
+            style={styles.primaryBtn}
+            onClick={() => rows[0] && setPaymentTarget({ patientId: rows[0].id, mode: "avulso" })}
+          >
+            <Plus size={16} /> Cobrança avulsa
+          </button>
+        }
+      />
       <div style={styles.cardsGrid} className="cards-grid">
-        <MetricCard label="Receita prevista" value={formatMoeda(totalPrevisto)} icon={DollarSign} accent="#16332E" />
-        <MetricCard label="Receita recebida" value={formatMoeda(totalRecebido)} icon={TrendingUp} accent="#7FAE86" />
-        <MetricCard label="Receita pendente" value={formatMoeda(totalPendente)} icon={AlertTriangle} accent="#E8B85E" />
+        <MetricCard label="Receita prevista" value={formatMoeda(totalPrevisto)} icon={DollarSign} accent="#867A6E" />
+        <MetricCard label="Receita recebida" value={formatMoeda(totalRecebido)} icon={TrendingUp} accent="#918567" />
+        <MetricCard label="Receita pendente" value={formatMoeda(totalPendente)} icon={AlertTriangle} accent="#AFA998" />
       </div>
       <div style={styles.panel}>
         <div style={styles.tableHeader} className="table-header">
@@ -1102,17 +8336,113 @@ function Financeiro({ patients }) {
           <div style={{ flex: 1 }}>Recebido</div>
           <div style={{ flex: 1 }}>Pendente</div>
           <div style={{ flex: 1 }}>Status</div>
+          <div style={{ width: 36 }} />
         </div>
         {rows.map((r) => (
           <div key={r.id} style={styles.tableRow} className="table-row">
-            <div style={{ flex: 2, fontWeight: 600, color: "#16332E" }}>{r.nome}</div>
-            <div style={{ flex: 1, fontSize: 13, color: "#4B615D" }} data-label="Plano">{r.acompanhamento?.tipo}</div>
-            <div style={{ flex: 1, fontSize: 13, color: "#4B615D" }} data-label="Pagamento">{r.acompanhamento?.formaPagamento} · {r.acompanhamento?.parcelas}x</div>
-            <div style={{ flex: 1, fontSize: 13, color: "#7FAE86", fontWeight: 600 }} data-label="Recebido">{formatMoeda(r.recebido)}</div>
-            <div style={{ flex: 1, fontSize: 13, color: "#F2704A", fontWeight: 600 }} data-label="Pendente">{formatMoeda(r.pendente)}</div>
+            <div style={{ flex: 2, fontWeight: 600, color: "#867A6E" }}>{r.nome}</div>
+            <div style={{ flex: 1, fontSize: 13, color: "#6E6355" }} data-label="Plano">{r.acompanhamento?.tipo}</div>
+            <div style={{ flex: 1, fontSize: 13, color: "#6E6355" }} data-label="Pagamento">{r.acompanhamento?.formaPagamento} · {r.acompanhamento?.parcelas}x</div>
+            <div style={{ flex: 1, fontSize: 13, color: "#918567", fontWeight: 600 }} data-label="Recebido">{formatMoeda(r.recebidoTotal)}</div>
+            <div style={{ flex: 1, fontSize: 13, color: "#A99790", fontWeight: 600 }} data-label="Pendente">{formatMoeda(r.pendente)}</div>
             <div style={{ flex: 1 }} data-label="Status"><StatusPill status={r.status} /></div>
+            <div style={{ width: 36 }} onClick={(e) => e.stopPropagation()}>
+              {r.pendente > 0 && (
+                <button
+                  title="Registrar pagamento"
+                  onClick={() => setPaymentTarget({ patientId: r.id, mode: "parcela" })}
+                  style={{
+                    background: "#EFE6D8", border: "none", borderRadius: 8, padding: 6,
+                    display: "flex", color: "#867A6E", cursor: "pointer"
+                  }}
+                >
+                  <DollarSign size={14} />
+                </button>
+              )}
+            </div>
           </div>
         ))}
+      </div>
+
+      {todosPagamentos.length > 0 && (
+        <div style={styles.panel}>
+          <div style={styles.panelTitle}>Pagamentos recentes</div>
+          {todosPagamentos.map((pg) => (
+            <div key={pg.id} style={styles.agendaRow} className="agenda-row">
+              <DollarSign size={15} color={pg.tipo === "avulso" ? "#AFA998" : "#918567"} />
+              <div className="agenda-name" style={{ fontWeight: 600, color: "#867A6E", width: 180 }}>{pg.pacienteNome}</div>
+              <div style={{ fontSize: 13, color: "#6E6355" }}>{formatMoeda(pg.valor)} · {pg.formaPagamento}</div>
+              <div style={{ fontSize: 12, color: "#9C9284", marginLeft: "auto" }}>{formatData(pg.data)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {paymentTarget && (
+        <PaymentModal
+          patients={rows}
+          target={paymentTarget}
+          onClose={() => setPaymentTarget(null)}
+          onSave={(patientId, pagamento) => {
+            onAddPagamento(patientId, pagamento);
+            setPaymentTarget(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function PaymentModal({ patients, target, onClose, onSave }) {
+  const isAvulso = target.mode === "avulso";
+  const patientInicial = patients.find((p) => p.id === target.patientId);
+  const sugestao =
+    !isAvulso && patientInicial?.acompanhamento?.consultasTotal
+      ? Math.round((patientInicial.acompanhamento.valor / patientInicial.acompanhamento.consultasTotal) * 100) / 100
+      : "";
+
+  const [patientId, setPatientId] = useState(target.patientId || patients[0]?.id || "");
+  const [valor, setValor] = useState(sugestao);
+  const [data, setData] = useState(new Date().toISOString().slice(0, 10));
+  const [forma, setForma] = useState(patientInicial?.acompanhamento?.formaPagamento || "Pix");
+  const [obs, setObs] = useState("");
+
+  const submit = () => {
+    if (!patientId || !valor || Number(valor) <= 0) return;
+    onSave(patientId, {
+      id: uid(), data, valor: Number(valor), formaPagamento: forma,
+      tipo: isAvulso ? "avulso" : "parcela", obs
+    });
+  };
+
+  return (
+    <div style={styles.overlay} onClick={onClose}>
+      <div style={{ ...styles.modal, width: 420 }} className="modal" onClick={(e) => e.stopPropagation()}>
+        <div style={styles.drawerHeader} className="drawer-header">
+          <div style={{ fontFamily: "Playfair Display, serif", fontSize: 18, fontWeight: 600, color: "#867A6E" }}>
+            {isAvulso ? "Cobrança avulsa" : "Registrar pagamento"}
+          </div>
+          <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
+        </div>
+        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+          {isAvulso && (
+            <Field
+              label="Paciente"
+              type="select"
+              options={patients.map((p) => p.nome)}
+              value={patients.find((p) => p.id === patientId)?.nome || ""}
+              onChange={(nome) => setPatientId(patients.find((p) => p.nome === nome)?.id)}
+            />
+          )}
+          <Field label="Valor (R$)" type="number" value={valor} onChange={setValor} />
+          <Field label="Data" type="date" value={data} onChange={setData} />
+          <Field label="Forma de pagamento" type="select" options={["Pix", "Cartão", "Boleto", "Dinheiro"]} value={forma} onChange={setForma} />
+          {isAvulso && <Field label="Descrição (opcional)" value={obs} onChange={setObs} />}
+        </div>
+        <div className="modal-footer" style={{ padding: "16px 20px", borderTop: "1px solid #E3DACB", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button style={styles.secondaryBtn} onClick={onClose}>Cancelar</button>
+          <button style={styles.primaryBtn} onClick={submit}>Salvar</button>
+        </div>
       </div>
     </div>
   );
@@ -1123,17 +8453,17 @@ function Financeiro({ patients }) {
 --------------------------------------------------------- */
 const styles = {
   root: {
-    display: "flex", minHeight: "100vh", background: "#FBFBF8",
-    fontFamily: "Inter, sans-serif", color: "#16332E"
+    display: "flex", minHeight: "100vh", background: "#F6F0E7",
+    fontFamily: "Lato, sans-serif", color: "#867A6E"
   },
   sidebar: {
-    width: 230, background: "#FFFFFF", borderRight: "1px solid #EDEAE0",
+    width: 230, background: "#FFFFFF", borderRight: "1px solid #E3DACB",
     padding: "22px 18px", display: "flex", flexDirection: "column", flexShrink: 0
   },
   logo: { display: "flex", alignItems: "center", gap: 10, paddingBottom: 4 },
   newBtn: {
     marginTop: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-    background: "#16332E", color: "#FBFBF8", border: "none", borderRadius: 8,
+    background: "#867A6E", color: "#F6F0E7", border: "none", borderRadius: 8,
     padding: "10px 12px", fontSize: 13, fontWeight: 600
   },
   navItem: {
@@ -1141,108 +8471,108 @@ const styles = {
     borderRadius: 8, fontSize: 13.5, fontWeight: 500, marginBottom: 3, cursor: "pointer"
   },
   sidebarFooter: {
-    marginTop: "auto", fontSize: 11.5, color: "#8C99A6", lineHeight: 1.5,
-    borderTop: "1px solid #EDEAE0", paddingTop: 14
+    marginTop: "auto", fontSize: 11.5, color: "#9C9284", lineHeight: 1.5,
+    borderTop: "1px solid #E3DACB", paddingTop: 14
   },
   main: { flex: 1, display: "flex", flexDirection: "column", minWidth: 0 },
   header: {
     display: "flex", justifyContent: "space-between", alignItems: "center",
-    padding: "16px 28px", borderBottom: "1px solid #EDEAE0", background: "#FFFFFF"
+    padding: "16px 28px", borderBottom: "1px solid #E3DACB", background: "#FFFFFF"
   },
   searchInput: {
     width: "100%", padding: "9px 12px 9px 34px", borderRadius: 8,
-    border: "1px solid #EDEAE0", fontSize: 13, outline: "none", background: "#FBFBF8"
+    border: "1px solid #E3DACB", fontSize: 13, outline: "none", background: "#F6F0E7"
   },
   content: { padding: 28, overflowY: "auto", flex: 1 },
   cardsGrid: {
     display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 22
   },
   metricCard: {
-    background: "#FFFFFF", border: "1px solid #EDEAE0", borderRadius: 12,
+    background: "#FFFFFF", border: "1px solid #E3DACB", borderRadius: 12,
     padding: 16, display: "flex", alignItems: "center", gap: 12
   },
   metricIcon: {
     width: 36, height: 36, borderRadius: 9, display: "flex",
     alignItems: "center", justifyContent: "center", flexShrink: 0
   },
-  metricValue: { fontSize: 19, fontWeight: 700, color: "#16332E", lineHeight: 1.2 },
-  metricLabel: { fontSize: 12, color: "#8C99A6", marginTop: 1 },
+  metricValue: { fontSize: 19, fontWeight: 700, color: "#867A6E", lineHeight: 1.2 },
+  metricLabel: { fontSize: 12, color: "#9C9284", marginTop: 1 },
   chartsGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 22 },
   panel: {
-    background: "#FFFFFF", border: "1px solid #EDEAE0", borderRadius: 12,
+    background: "#FFFFFF", border: "1px solid #E3DACB", borderRadius: 12,
     padding: 20, marginBottom: 14
   },
-  panelTitle: { fontSize: 14, fontWeight: 700, color: "#16332E", marginBottom: 12 },
-  emptyRow: { fontSize: 13, color: "#8C99A6", padding: "10px 0" },
+  panelTitle: { fontSize: 14, fontWeight: 700, color: "#867A6E", marginBottom: 12 },
+  emptyRow: { fontSize: 13, color: "#9C9284", padding: "10px 0" },
   riskRow: {
     display: "flex", justifyContent: "space-between", alignItems: "center",
-    padding: "10px 0", borderBottom: "1px solid #F4F2EB", cursor: "pointer"
+    padding: "10px 0", borderBottom: "1px solid #EFE6D8", cursor: "pointer"
   },
   tableHeader: {
     display: "flex", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4,
-    color: "#8C99A6", padding: "0 0 10px", borderBottom: "1px solid #EDEAE0", marginBottom: 4
+    color: "#9C9284", padding: "0 0 10px", borderBottom: "1px solid #E3DACB", marginBottom: 4
   },
   tableRow: {
     display: "flex", alignItems: "center", padding: "13px 0",
-    borderBottom: "1px solid #F4F2EB", cursor: "pointer"
+    borderBottom: "1px solid #EFE6D8", cursor: "pointer"
   },
   primaryBtn: {
-    display: "flex", alignItems: "center", gap: 6, background: "#16332E", color: "#FBFBF8",
+    display: "flex", alignItems: "center", gap: 6, background: "#867A6E", color: "#F6F0E7",
     border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600
   },
   secondaryBtn: {
-    background: "#FFFFFF", color: "#16332E", border: "1px solid #EDEAE0",
+    background: "#FFFFFF", color: "#867A6E", border: "1px solid #E3DACB",
     borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600
   },
   overlay: {
-    position: "fixed", inset: 0, background: "rgba(22,51,46,0.35)",
+    position: "fixed", inset: 0, background: "rgba(134,122,110,0.35)",
     display: "flex", justifyContent: "flex-end", zIndex: 50
   },
   drawer: {
-    width: 640, maxWidth: "94vw", background: "#FBFBF8", height: "100%",
+    width: 640, maxWidth: "94vw", background: "#F6F0E7", height: "100%",
     display: "flex", flexDirection: "column", boxShadow: "-8px 0 24px rgba(0,0,0,0.08)"
   },
   drawerHeader: {
     display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-    padding: "20px 24px", borderBottom: "1px solid #EDEAE0", background: "#FFFFFF"
+    padding: "20px 24px", borderBottom: "1px solid #E3DACB", background: "#FFFFFF"
   },
   iconBtn: {
-    background: "#F4F2EB", border: "none", borderRadius: 8, padding: 7,
-    display: "flex", color: "#4B615D"
+    background: "#EFE6D8", border: "none", borderRadius: 8, padding: 7,
+    display: "flex", color: "#6E6355"
   },
-  divider: { height: 1, background: "#EDEAE0", margin: "18px 0" },
-  miniTitle: { fontSize: 11, color: "#8C99A6", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 },
+  divider: { height: 1, background: "#E3DACB", margin: "18px 0" },
+  miniTitle: { fontSize: 11, color: "#9C9284", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 },
   tagPill: {
     display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5,
-    background: "#F4F2EB", color: "#4B615D", padding: "4px 9px", borderRadius: 20
+    background: "#EFE6D8", color: "#6E6355", padding: "4px 9px", borderRadius: 20
   },
   timelineItem: { display: "flex", gap: 12, paddingBottom: 18, position: "relative" },
   timelineDot: {
-    width: 8, height: 8, borderRadius: 8, background: "#7FAE86", marginTop: 5, flexShrink: 0
+    width: 8, height: 8, borderRadius: 8, background: "#918567", marginTop: 5, flexShrink: 0
   },
   evoRow: {
-    display: "flex", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #F4F2EB"
+    display: "flex", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #EFE6D8"
   },
   modal: {
-    margin: "auto", width: 620, maxWidth: "94vw", maxHeight: "88vh", background: "#FBFBF8",
+    margin: "auto", width: 620, maxWidth: "94vw", maxHeight: "88vh", background: "#F6F0E7",
     borderRadius: 14, display: "flex", flexDirection: "column", boxShadow: "0 20px 50px rgba(0,0,0,0.2)"
   },
   input: {
-    width: "100%", padding: "9px 11px", borderRadius: 8, border: "1px solid #EDEAE0",
+    width: "100%", padding: "9px 11px", borderRadius: 8, border: "1px solid #E3DACB",
     fontSize: 13.5, outline: "none", background: "#FFFFFF"
   },
   agendaRow: {
-    display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: "1px solid #F4F2EB"
+    display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: "1px solid #EFE6D8"
   },
   kanbanCol: {
-    background: "#F4F2EB", borderRadius: 12, padding: 12, width: 240, flexShrink: 0, minHeight: 300
+    background: "#EFE6D8", borderRadius: 12, padding: 12, width: 240, flexShrink: 0, minHeight: 300
   },
-  kanbanColHeader: { fontSize: 12.5, fontWeight: 700, color: "#16332E", marginBottom: 10 },
+  kanbanColHeader: { fontSize: 12.5, fontWeight: 700, color: "#867A6E", marginBottom: 10 },
   kanbanCard: {
-    background: "#FFFFFF", border: "1px solid #EDEAE0", borderRadius: 10, padding: 10
+    background: "#FFFFFF", border: "1px solid #E3DACB", borderRadius: 10, padding: 10
   },
   kanbanSelect: {
     marginTop: 8, width: "100%", fontSize: 11, padding: "5px 6px", borderRadius: 6,
-    border: "1px solid #EDEAE0", background: "#FBFBF8", color: "#4B615D"
+    border: "1px solid #E3DACB", background: "#F6F0E7", color: "#6E6355"
   }
 };
