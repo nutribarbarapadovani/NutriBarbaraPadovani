@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>Teste</title>
+</head>
+<body style="font-family: sans-serif; padding: 40px; text-align: center;">
+  <h1 id="resultado" style="color: orange;">Carregando...</h1>
+  <p id="detalhes"></p>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    window.onload = function () {
+      const resultado = document.getElementById("resultado");
+      const detalhes = document.getElementById("detalhes");
+      if (window.supabase) {
+        resultado.textContent = "✅ FUNCIONOU!";
+        resultado.style.color = "green";
+        detalhes.textContent = "A biblioteca do Supabase carregou normalmente.";
+      } else {
+        resultado.textContent = "❌ NÃO FUNCIONOU";
+        resultado.style.color = "red";
+        detalhes.textContent = "A biblioteca do Supabase não carregou neste navegador/rede.";
+      }
+    };
+  </script>
+</body>
+</html>
