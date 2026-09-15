@@ -118,3 +118,21 @@ Na tela **Integrações**, é possível conectar o CRM à conta Google da Bárba
 - **Classificação em massa por idade**: em Integrações, um botão sugere automaticamente o tipo de acompanhamento (Introdução Alimentar/Seletividade/Trilhar) para pacientes que já têm data de nascimento cadastrada e ainda não têm um tipo definido.
 
 **Nota sobre acesso**: o CRM não tem senha de login — o link fica aberto para quem o acessar. Se no futuro isso precisar mudar (por exemplo, por exigência de proteção de dados de saúde), o caminho recomendado é migrar para um backend com autenticação de verdade (ex: Supabase), já que qualquer proteção puramente no navegador (sem servidor) pode ser contornada por alguém com conhecimento técnico.
+
+### Melhorias clínicas e comerciais (atualização mais recente)
+
+- **Curva de crescimento (referência OMS, aproximada)** — na aba "Consultas" do paciente, gráfico com P3/P50/P97 de peso-por-idade e altura-por-idade, por sexo, sobrepondo as medições reais do paciente. **Atenção**: os valores de referência usados são uma aproximação clinicamente razoável, não a tabela oficial completa da OMS (LMS) — a tela deixa isso explícito e recomenda conferir a curva oficial da OMS/Caderneta da Criança para decisões clínicas.
+- **Origem do paciente** — campo (Instagram/Indicação/Grupo VIP/Google/WhatsApp/Outro) no cadastro e na ficha, para entender de onde vêm as prospecções.
+- **Taxa de conversão (geral)** — novo card no Painel: % de todas as prospecções que já viraram pacientes.
+- **Alerta visual de alergia** — banner vermelho destacado na ficha do paciente quando há alergia registrada.
+- **Registro alimentar / recordatório** — nova aba "Alimentação" na ficha do paciente, com histórico de registros do que a criança comeu num dia típico.
+- **Plano alimentar vigente** — campo de texto/link (ex: Google Drive) anexado à aba "Acompanhamento", para não precisar procurar o plano em outro lugar.
+
+### Auditoria de usabilidade (todos os acessos funcionais)
+
+- Botões de contato direto na ficha do paciente: Ligar, WhatsApp, E-mail, Ver no mapa.
+- WhatsApp direto na lista de pacientes (ícone por linha).
+- Cards do Painel agora navegam para a lista filtrada ou para o Financeiro.
+- "Aniversariantes da semana" virou uma lista com botão "Parabenizar" (abre WhatsApp com mensagem pronta).
+- Busca do cabeçalho navega automaticamente para Pacientes quando usada em outra tela.
+- "Status da negociação" das prospecções agora é um campo editável (com sugestões automáticas), não só uma tag importada.
