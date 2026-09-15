@@ -66,7 +66,7 @@ Sem dependência de backend para rodar — os dados ficam em memória/armazename
    npm create vite@latest crescer-crm -- --template react
    cd crescer-crm
    npm install
-   npm install recharts lucide-react
+   npm install recharts lucide-react @supabase/supabase-js
    ```
 2. Substitua o conteúdo de `src/App.jsx` pelo arquivo `crm-nutricionista-pediatrica.jsx` deste repositório.
 3. Rode:
@@ -136,3 +136,46 @@ Na tela **Integrações**, é possível conectar o CRM à conta Google da Bárba
 - "Aniversariantes da semana" virou uma lista com botão "Parabenizar" (abre WhatsApp com mensagem pronta).
 - Busca do cabeçalho navega automaticamente para Pacientes quando usada em outra tela.
 - "Status da negociação" das prospecções agora é um campo editável (com sugestões automáticas), não só uma tag importada.
+
+### Reformulação para Prontuário + Administração (atualização mais recente)
+
+- **"Pacientes" renomeado para "Prontuário"** em todo o site, com status reorganizados em **Ativos / Inativos / Receberam alta / Prospecção**.
+- **Novos campos no prontuário**: dificuldade alimentar, cor favorita, personagens favoritos — além dos já existentes (peso, altura, aniversário, tipo de acompanhamento, frequência), todos individuais por criança. Idade, peso e altura atuais agora aparecem automaticamente calculados na ficha.
+- **Nova aba "Plano de Ação"** na ficha do paciente: texto do plano atual + 3 gráficos/evoluções — peso (reaproveitando a curva já existente), exames (com categorias Normal/Atenção/Alterado) e evolução alimentar (linha do tempo narrativa, ex: "passou a comer 5 legumes", "reduziu doces").
+- **Nova aba "Administração"** no menu principal: modelos de contrato editáveis para cada um dos 4 tipos de acompanhamento (com campos que preenchem automaticamente ao gerar o contrato de um paciente específico) e uma lista de comprovantes (pagamentos registrados). **Atenção**: os contratos são um modelo de ponto de partida, não documento jurídico validado — recomendamos revisão por advogado antes do uso real.
+- **Agenda sincronizada automaticamente**: ao registrar uma consulta na aba "Consultas", o CRM agenda sozinho a próxima etapa do plano de acompanhamento (se ainda não houver um agendamento futuro para aquele paciente).
+
+**Pendente para uma próxima etapa** (depende do bot do WhatsApp estar confirmado funcionando): mensagem automática no dia da próxima consulta, e sequência de follow-up automático em 24h/2 dias/15 dias/30 dias com inativação automática de quem não responde.
+
+### Ficha do paciente consolidada em uma única tela (atualização mais recente)
+
+Depois de feedback direto sobre o fluxo real de trabalho, a ficha do paciente deixou de ter abas
+(Dados / Timeline / Consultas / Alimentação / Plano de Ação / Acompanhamento) e virou **uma única
+tela contínua**, sequencial, sem precisar clicar pra trocar de seção:
+
+- **Removida a Timeline** (log de atividades) — não fazia parte do fluxo dela.
+- **Removido "Registro alimentar" (recordatório)** e **"Plano alimentar" (link de documento)** — não é
+  algo que ela usa; foram premissas erradas da minha parte.
+- **Mantido apenas o que foi pedido de verdade**: dados básicos + contato → consultas e curva de
+  crescimento → plano de ação (texto + evolução de exames + evolução alimentar) → acompanhamento e
+  pagamentos, tudo em sequência numa rolagem só.
+
+### Migração para banco de dados compartilhado — Supabase (atualização mais recente)
+
+O CRM deixou de guardar dados só no navegador (localStorage) e passou a usar o **Supabase** como
+fonte de dados real, compartilhada com o bot do WhatsApp. Na prática:
+
+- Pacientes, agenda, follow-ups e configurações agora vivem no banco de dados do Supabase
+  (projeto `vfclzwrmfzogdpeclxrx`), não mais isolados no navegador de cada aparelho.
+- Toda ação no CRM (cadastrar paciente, registrar consulta, criar follow-up, etc.) grava direto
+  no banco — o que ela faz no site aparece pro bot, e o que o bot faz (uma vez que os comandos
+  automáticos estiverem prontos) aparece no site.
+- **Antes de usar**, rode o script `supabase_migracao_colunas.sql` no SQL Editor do Supabase —
+  ele adiciona colunas que foram criadas depois do banco original (dificuldade alimentar, cor
+  favorita, personagens favoritos, plano de ação, exames, evolução alimentar).
+- A chave usada no site é a chave pública ("anon"), protegida por políticas de acesso (RLS) —
+  é segura de expor no código do site, ao contrário da chave "service_role".
+
+**O que ainda falta** (próxima etapa): as mensagens automáticas do WhatsApp (lembrete de consulta
+e sequência de follow-up 24h/2d/15d/30d) — essas dependem de uma tarefa agendada rodando no
+Supabase, que ainda será construída.

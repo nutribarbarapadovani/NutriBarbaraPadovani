@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { createClient } from "@supabase/supabase-js";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, AreaChart, Area
@@ -344,7 +345,7 @@ const KANBAN_COLS = [
   { id: "concluido", label: "Concluído" }
 ];
 
-const STATUS_LABEL = { ativo: "Ativo", pausa: "Em pausa", concluido: "Concluído", prospect: "Prospecção" };
+const STATUS_LABEL = { ativo: "Ativo", pausa: "Inativo", concluido: "Recebeu alta", prospect: "Prospecção" };
 const NEGOCIACAO_SUGESTOES = [
   "Interessada - aguardando retorno",
   "Proposta enviada",
@@ -359,6 +360,61 @@ const ORIGEM_OPCOES = ["Instagram", "Indicação", "Grupo VIP", "Google", "Whats
 const SEM_ALERGIA_TEXTOS = ["", "nenhuma", "não", "nao", "-", "n/a", "sem alergias", "não possui", "nao possui"];
 const STATUS_COLOR = { ativo: "#918567", pausa: "#AFA998", concluido: "#9C9284", prospect: "#A99790" };
 const PRIORIDADE_COLOR = { alta: "#A99790", media: "#AFA998", baixa: "#CFC7B6" };
+const CATEGORIA_EXAME = {
+  normal: { label: "Normal", color: "#918567" },
+  atencao: { label: "Atenção", color: "#C99A4A" },
+  alterado: { label: "Alterado", color: "#A99790" }
+};
+
+// Modelos de contrato — ponto de partida editável. Não é aconselhamento
+// jurídico; recomenda-se revisão por advogado antes do uso com pacientes.
+const CONTRATOS_PADRAO = {
+  introducao_alimentar:
+    "TERMO DE COMPROMISSO COM O ACOMPANHAMENTO NUTRICIONAL\nPrograma: Introdução Alimentar\n\n" +
+    "Nutricionista: Bárbara Sales — CRN 7168\nPaciente: {{nome}}\nResponsável: {{responsavel}}\n\n" +
+    "Este termo formaliza o compromisso do responsável com o acompanhamento nutricional de {{nome}}, " +
+    "voltado à introdução alimentar, com duração prevista de {{duracao}} meses, início em {{dataInicio}} e término previsto em {{dataFim}}.\n\n" +
+    "Ao assinar, o responsável se compromete a:\n" +
+    "1. Comparecer às consultas e momentos práticos agendados, avisando com antecedência em caso de impossibilidade;\n" +
+    "2. Aplicar em casa as orientações combinadas para a introdução alimentar, mantendo a rotina proposta;\n" +
+    "3. Manter consistência no processo, entendendo que os resultados dependem do envolvimento ativo da família no dia a dia;\n" +
+    "4. Comunicar à nutricionista qualquer dificuldade, dúvida ou mudança relevante na rotina alimentar da criança.\n\n" +
+    "A nutricionista se compromete a oferecer acompanhamento individualizado, orientações baseadas em evidência científica e suporte durante todo o programa.\n\n" +
+    "Data: ___/___/______\n\nAssinatura do responsável: _____________________________\nAssinatura da nutricionista: _____________________________",
+  seletividade:
+    "TERMO DE COMPROMISSO COM O ACOMPANHAMENTO NUTRICIONAL\nPrograma: Seletividade Alimentar\n\n" +
+    "Nutricionista: Bárbara Sales — CRN 7168\nPaciente: {{nome}}\nResponsável: {{responsavel}}\n\n" +
+    "Este termo formaliza o compromisso do responsável com o acompanhamento nutricional de {{nome}}, " +
+    "voltado à seletividade alimentar, com duração prevista de {{duracao}} meses, início em {{dataInicio}} e término previsto em {{dataFim}}.\n\n" +
+    "Ao assinar, o responsável se compromete a:\n" +
+    "1. Comparecer às consultas e atividades práticas agendadas, avisando com antecedência em caso de impossibilidade;\n" +
+    "2. Executar em casa o plano de ação combinado, mantendo consistência no momento das refeições;\n" +
+    "3. Ter paciência com o ritmo da criança, entendendo que os resultados dependem do envolvimento ativo da família;\n" +
+    "4. Comunicar à nutricionista qualquer dificuldade ou retrocesso observado entre as consultas.\n\n" +
+    "A nutricionista se compromete a oferecer acompanhamento individualizado, orientações baseadas em evidência científica e suporte durante todo o programa.\n\n" +
+    "Data: ___/___/______\n\nAssinatura do responsável: _____________________________\nAssinatura da nutricionista: _____________________________",
+  trilhar:
+    "TERMO DE COMPROMISSO COM O ACOMPANHAMENTO NUTRICIONAL\nPrograma: Trilhar\n\n" +
+    "Nutricionista: Bárbara Sales — CRN 7168\nPaciente: {{nome}}\nResponsável: {{responsavel}}\n\n" +
+    "Este termo formaliza o compromisso do responsável com o acompanhamento nutricional de {{nome}}, " +
+    "com encontros presenciais e online alternados, duração prevista de {{duracao}} meses, início em {{dataInicio}} e término previsto em {{dataFim}}.\n\n" +
+    "Ao assinar, o responsável se compromete a:\n" +
+    "1. Comparecer aos encontros agendados (presenciais e online), avisando com antecedência em caso de impossibilidade;\n" +
+    "2. Dar continuidade em casa às atividades combinadas entre um encontro e outro;\n" +
+    "3. Manter consistência no processo, entendendo que os resultados dependem do envolvimento ativo da família no dia a dia;\n" +
+    "4. Comunicar à nutricionista qualquer dificuldade ou mudança relevante na rotina da criança.\n\n" +
+    "A nutricionista se compromete a oferecer acompanhamento individualizado, orientações baseadas em evidência científica e suporte durante todo o programa.\n\n" +
+    "Data: ___/___/______\n\nAssinatura do responsável: _____________________________\nAssinatura da nutricionista: _____________________________",
+  avulso:
+    "TERMO DE COMPROMISSO COM O ACOMPANHAMENTO NUTRICIONAL\nPrograma: Consulta avulsa\n\n" +
+    "Nutricionista: Bárbara Sales — CRN 7168\nPaciente: {{nome}}\nResponsável: {{responsavel}}\n\n" +
+    "Este termo formaliza o compromisso do responsável com a(s) consulta(s) nutricional(is) agendada(s) para {{nome}}.\n\n" +
+    "Ao assinar, o responsável se compromete a:\n" +
+    "1. Comparecer à(s) consulta(s) agendada(s), avisando com antecedência em caso de impossibilidade;\n" +
+    "2. Aplicar em casa as orientações fornecidas na consulta;\n" +
+    "3. Comunicar à nutricionista qualquer dúvida sobre as orientações recebidas.\n\n" +
+    "Data: ___/___/______\n\nAssinatura do responsável: _____________________________\nAssinatura da nutricionista: _____________________________"
+};
 
 /* ---------------------------------------------------------
    Curva de crescimento — valores de referência aproximados
@@ -444,6 +500,115 @@ const GrowthMark = ({ size = 28 }) => (
 );
 
 /* ---------------------------------------------------------
+   Conexão com o Supabase — banco de dados compartilhado entre
+   o CRM (navegador) e o bot do WhatsApp
+--------------------------------------------------------- */
+const SUPABASE_URL = "https://vfclzwrmfzogdpeclxrx.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmY2x6d3JtZnpvZ2RwZWNseHJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0ODA5NjYsImV4cCI6MjEwNTA1Njk2Nn0.lkzdAd8JYRXsqKaAUjBHn2HyKr2Dj9H_PIrTLFUUiqM";
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Conversão entre o formato do CRM (camelCase) e as colunas do banco (snake_case)
+function patientToRow(p) {
+  return {
+    id: p.id,
+    nome: p.nome || "",
+    data_nascimento: p.dataNascimento || null,
+    sexo: p.sexo || "F",
+    escola: p.escola || "",
+    diagnostico: p.diagnostico || "",
+    dificuldade_alimentar: p.dificuldadeAlimentar || "",
+    alergias: p.alergias || "",
+    medicamentos: p.medicamentos || "",
+    pediatra: p.pediatra || "",
+    responsavel: p.responsavel || "",
+    telefone: p.telefone || "",
+    whatsapp: p.whatsapp || "",
+    email: p.email || "",
+    endereco: p.endereco || "",
+    origem: p.origem || "",
+    cor_favorita: p.corFavorita || "",
+    personagens_favoritos: p.personagensFavoritos || "",
+    status: p.status || "ativo",
+    status_negociacao: p.statusNegociacao || "",
+    ultimo_contato: p.ultimoContato || null,
+    plano_acao: p.planoAcao || "",
+    tags: p.tags || [],
+    acompanhamento: p.acompanhamento || {},
+    pagamentos: p.pagamentos || [],
+    evolucao: p.evolucao || [],
+    sessoes: p.sessoes || [],
+    exames: p.exames || [],
+    marcos_alimentares: p.marcosAlimentares || [],
+    timeline: p.timeline || []
+  };
+}
+function patientFromRow(r) {
+  return {
+    id: r.id,
+    nome: r.nome || "",
+    dataNascimento: r.data_nascimento || "",
+    sexo: r.sexo || "F",
+    escola: r.escola || "",
+    diagnostico: r.diagnostico || "",
+    dificuldadeAlimentar: r.dificuldade_alimentar || "",
+    alergias: r.alergias || "",
+    medicamentos: r.medicamentos || "",
+    pediatra: r.pediatra || "",
+    responsavel: r.responsavel || "",
+    telefone: r.telefone || "",
+    whatsapp: r.whatsapp || "",
+    email: r.email || "",
+    endereco: r.endereco || "",
+    origem: r.origem || "",
+    corFavorita: r.cor_favorita || "",
+    personagensFavoritos: r.personagens_favoritos || "",
+    status: r.status || "ativo",
+    statusNegociacao: r.status_negociacao || "",
+    ultimoContato: r.ultimo_contato || "",
+    planoAcao: r.plano_acao || "",
+    tags: r.tags || [],
+    acompanhamento: r.acompanhamento || {},
+    pagamentos: r.pagamentos || [],
+    evolucao: r.evolucao || [],
+    sessoes: r.sessoes || [],
+    exames: r.exames || [],
+    marcosAlimentares: r.marcos_alimentares || [],
+    timeline: r.timeline || []
+  };
+}
+function eventToRow(e) {
+  return {
+    id: e.id, paciente_id: e.pacienteId, data: e.data, hora: e.hora || "",
+    tipo: e.tipo || "Consulta", status: e.status || "agendado", obs: e.obs || "",
+    google_event_id: e.googleEventId || null
+  };
+}
+function eventFromRow(r) {
+  return {
+    id: r.id, pacienteId: r.paciente_id, data: r.data, hora: r.hora || "",
+    tipo: r.tipo || "Consulta", status: r.status || "agendado", obs: r.obs || "",
+    googleEventId: r.google_event_id || undefined
+  };
+}
+function followupToRow(f) {
+  return {
+    id: f.id, paciente_id: f.pacienteId, titulo: f.titulo, tipo: f.tipo || "",
+    prioridade: f.prioridade || "media", prazo: f.prazo || null, coluna: f.coluna || "afazer",
+    responsavel: f.responsavel || "Nutricionista", google_event_id: f.googleEventId || null
+  };
+}
+function followupFromRow(r) {
+  return {
+    id: r.id, pacienteId: r.paciente_id, titulo: r.titulo, tipo: r.tipo || "",
+    prioridade: r.prioridade || "media", prazo: r.prazo || "", coluna: r.coluna || "afazer",
+    responsavel: r.responsavel || "Nutricionista", googleEventId: r.google_event_id || undefined
+  };
+}
+
+/* ---------------------------------------------------------
+   App principal
+--------------------------------------------------------- */
+/* ---------------------------------------------------------
    App principal
 --------------------------------------------------------- */
 export default function App() {
@@ -458,14 +623,15 @@ export default function App() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [events, setEvents] = useState([]);
 
-  // A busca do cabeçalho pesquisa pacientes — se digitar em outra tela, navega pra Pacientes
   useEffect(() => {
     if (query.trim() && view !== "patients") {
       setFiltroPacientesInicial("todos");
       setView("patients");
     }
   }, [query]);
+
   const [googleClientId, setGoogleClientId] = useState("");
+  const [contratosModelo, setContratosModelo] = useState(CONTRATOS_PADRAO);
   const [googleToken, setGoogleToken] = useState(null);
   const [gisReady, setGisReady] = useState(false);
   const [syncLog, setSyncLog] = useState([]);
@@ -474,25 +640,21 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await window.storage.get("crm-nutri-data", false);
-        if (res && res.value) {
-          const parsed = JSON.parse(res.value);
-          const p = parsed.patients || seedPatients();
-          setPatients(p);
-          setFollowups(parsed.followups || seedFollowups(p));
-          setEvents(parsed.events || seedEvents(p));
-          setGoogleClientId(parsed.googleClientId || "");
-        } else {
-          const p = seedPatients();
-          setPatients(p);
-          setFollowups(seedFollowups(p));
-          setEvents(seedEvents(p));
-        }
+        const [pacientesRes, eventosRes, followupsRes, settingsRes] = await Promise.all([
+          supabaseClient.from("patients").select("*"),
+          supabaseClient.from("events").select("*"),
+          supabaseClient.from("followups").select("*"),
+          supabaseClient.from("app_settings").select("*")
+        ]);
+        setPatients((pacientesRes.data || []).map(patientFromRow));
+        setEvents((eventosRes.data || []).map(eventFromRow));
+        setFollowups((followupsRes.data || []).map(followupFromRow));
+        const settingsMap = {};
+        (settingsRes.data || []).forEach((s) => { settingsMap[s.chave] = s.valor; });
+        setGoogleClientId(settingsMap.googleClientId || "");
+        setContratosModelo(settingsMap.contratosModelo ? JSON.parse(settingsMap.contratosModelo) : CONTRATOS_PADRAO);
       } catch (e) {
-        const p = seedPatients();
-        setPatients(p);
-        setFollowups(seedFollowups(p));
-        setEvents(seedEvents(p));
+        console.error("Falha ao carregar do Supabase:", e);
       }
       setLoaded(true);
     })();
@@ -500,20 +662,12 @@ export default function App() {
 
   useEffect(() => {
     if (!loaded) return;
-    (async () => {
-      try {
-        await window.storage.set(
-          "crm-nutri-data",
-          JSON.stringify({ patients, followups, events, googleClientId }),
-          false
-        );
-      } catch (e) {
-        console.error("Falha ao salvar:", e);
-      }
-    })();
-  }, [patients, followups, events, googleClientId, loaded]);
+    supabaseClient.from("app_settings").upsert([
+      { chave: "googleClientId", valor: googleClientId },
+      { chave: "contratosModelo", valor: JSON.stringify(contratosModelo) }
+    ]).then(() => {}).catch((e) => console.error("Falha ao salvar configurações:", e));
+  }, [googleClientId, contratosModelo, loaded]);
 
-  // Carrega o script do Google Identity Services quando há um Client ID configurado
   useEffect(() => {
     if (!googleClientId) return;
     if (window.google?.accounts?.oauth2) { setGisReady(true); return; }
@@ -568,46 +722,55 @@ export default function App() {
     const q = query.toLowerCase();
     return patients.filter((p) =>
       [p.nome, p.diagnostico, p.responsavel, p.telefone, ...(p.tags || [])]
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
+        .join(" ").toLowerCase().includes(q)
     );
   }, [patients, query]);
 
   const updatePatient = (id, patch) => {
-    setPatients((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+    setPatients((prev) => {
+      const atualizado = prev.map((p) => (p.id === id ? { ...p, ...patch } : p));
+      const pacienteAtualizado = atualizado.find((p) => p.id === id);
+      if (pacienteAtualizado) {
+        supabaseClient.from("patients").update(patientToRow(pacienteAtualizado)).eq("id", id)
+          .then(() => {}).catch((e) => console.error("Falha ao salvar paciente:", e));
+      }
+      return atualizado;
+    });
+  };
+  const addPatient = (patient) => {
+    const novo = { ...patient, id: uid() };
+    setPatients((prev) => [novo, ...prev]);
+    supabaseClient.from("patients").insert(patientToRow(novo))
+      .then(() => {}).catch((e) => console.error("Falha ao criar paciente:", e));
+  };
+  const nomeDoPaciente = (pacienteId) => patients.find((p) => p.id === pacienteId)?.nome || "Paciente";
+
+  const persistirPaciente = (paciente) => {
+    supabaseClient.from("patients").update(patientToRow(paciente)).eq("id", paciente.id)
+      .then(() => {}).catch((e) => console.error("Falha ao salvar paciente:", e));
   };
 
-  const addPatient = (patient) => {
-    setPatients((prev) => [{ ...patient, id: uid() }, ...prev]);
+  const mutarPaciente = (id, transformFn) => {
+    setPatients((prev) => prev.map((p) => {
+      if (p.id !== id) return p;
+      const atualizado = transformFn(p);
+      persistirPaciente(atualizado);
+      return atualizado;
+    }));
   };
 
   const exportarPacientesExcel = async () => {
     try {
       const XLSXlib = await carregarXLSX();
       const linhas = patients.map((p) => ({
-        Nome: p.nome,
-        "Data de nascimento": p.dataNascimento || "",
-        Idade: calcIdade(p.dataNascimento),
-        Sexo: p.sexo === "F" ? "Feminino" : "Masculino",
-        Status: STATUS_LABEL[p.status] || p.status,
-        Responsável: p.responsavel,
-        Telefone: p.telefone,
-        WhatsApp: p.whatsapp,
-        "E-mail": p.email,
-        Endereço: p.endereco,
-        Diagnóstico: p.diagnostico,
-        Alergias: p.alergias,
-        Medicamentos: p.medicamentos,
-        Pediatra: p.pediatra,
-        Tags: (p.tags || []).join(", "),
-        "Tipo de acompanhamento": p.acompanhamento?.tipo || "",
-        "Início do acompanhamento": p.acompanhamento?.dataInicio || "",
-        "Fim previsto": p.acompanhamento?.dataFim || "",
-        "Consultas realizadas": p.acompanhamento?.consultasRealizadas ?? "",
-        "Consultas total": p.acompanhamento?.consultasTotal ?? "",
-        "Valor do plano": p.acompanhamento?.valor || 0,
-        "Último contato": p.ultimoContato || ""
+        Nome: p.nome, "Data de nascimento": p.dataNascimento || "", Idade: calcIdade(p.dataNascimento),
+        Sexo: p.sexo === "F" ? "Feminino" : "Masculino", Status: STATUS_LABEL[p.status] || p.status,
+        Responsável: p.responsavel, Telefone: p.telefone, WhatsApp: p.whatsapp, "E-mail": p.email, Endereço: p.endereco,
+        Diagnóstico: p.diagnostico, Alergias: p.alergias, Medicamentos: p.medicamentos, Pediatra: p.pediatra,
+        Tags: (p.tags || []).join(", "), "Tipo de acompanhamento": p.acompanhamento?.tipo || "",
+        "Início do acompanhamento": p.acompanhamento?.dataInicio || "", "Fim previsto": p.acompanhamento?.dataFim || "",
+        "Consultas realizadas": p.acompanhamento?.consultasRealizadas ?? "", "Consultas total": p.acompanhamento?.consultasTotal ?? "",
+        "Valor do plano": p.acompanhamento?.valor || 0, "Último contato": p.ultimoContato || ""
       }));
       const ws = XLSXlib.utils.json_to_sheet(linhas);
       const wb = XLSXlib.utils.book_new();
@@ -768,14 +931,29 @@ export default function App() {
       );
       if (!confirmar) return;
 
-      if (novosPacientes.length > 0) setPatients((prev) => [...prev, ...novosPacientes]);
-      if (atualizacoes.length > 0) {
-        setPatients((prev) => prev.map((p) => {
-          const upd = atualizacoes.find((a) => a.id === p.id);
-          return upd ? { ...p, ...upd.patch } : p;
-        }));
+      if (novosPacientes.length > 0) {
+        setPatients((prev) => [...prev, ...novosPacientes]);
+        supabaseClient.from("patients").insert(novosPacientes.map(patientToRow))
+          .then(() => {}).catch((e) => console.error("Falha ao importar pacientes:", e));
       }
-      if (novosEventos.length > 0) setEvents((prev) => [...novosEventos, ...prev]);
+      if (atualizacoes.length > 0) {
+        setPatients((prev) => {
+          const atualizado = prev.map((p) => {
+            const upd = atualizacoes.find((a) => a.id === p.id);
+            return upd ? { ...p, ...upd.patch } : p;
+          });
+          atualizacoes.forEach((a) => {
+            const pacienteAtualizado = atualizado.find((p) => p.id === a.id);
+            if (pacienteAtualizado) persistirPaciente(pacienteAtualizado);
+          });
+          return atualizado;
+        });
+      }
+      if (novosEventos.length > 0) {
+        setEvents((prev) => [...novosEventos, ...prev]);
+        supabaseClient.from("events").insert(novosEventos.map(eventToRow))
+          .then(() => {}).catch((e) => console.error("Falha ao importar eventos:", e));
+      }
 
       logSync(`Importação concluída: ${novosPacientes.length} novo(s), ${atualizacoes.length} atualizado(s).`);
     } catch (err) {
@@ -787,24 +965,23 @@ export default function App() {
     const eventosDoPaciente = events.filter((e) => e.pacienteId === id);
     const followupsDoPaciente = followups.filter((f) => f.pacienteId === id);
     if (googleToken) {
-      eventosDoPaciente.forEach((e) => {
-        if (e.googleEventId) excluirEventoGoogle(googleToken, e.googleEventId).catch(() => {});
-      });
-      followupsDoPaciente.forEach((f) => {
-        if (f.googleEventId) excluirEventoGoogle(googleToken, f.googleEventId).catch(() => {});
-      });
+      eventosDoPaciente.forEach((e) => { if (e.googleEventId) excluirEventoGoogle(googleToken, e.googleEventId).catch(() => {}); });
+      followupsDoPaciente.forEach((f) => { if (f.googleEventId) excluirEventoGoogle(googleToken, f.googleEventId).catch(() => {}); });
     }
     setEvents((prev) => prev.filter((e) => e.pacienteId !== id));
     setFollowups((prev) => prev.filter((f) => f.pacienteId !== id));
     setPatients((prev) => prev.filter((p) => p.id !== id));
     setSelectedId(null);
+    // Eventos e follow-ups do paciente são removidos automaticamente no banco (cascade)
+    supabaseClient.from("patients").delete().eq("id", id)
+      .then(() => {}).catch((e) => console.error("Falha ao excluir paciente:", e));
     logSync("Paciente excluído do CRM.");
   };
 
-  const nomeDoPaciente = (pacienteId) => patients.find((p) => p.id === pacienteId)?.nome || "Paciente";
-
   const moveFollowup = (id, coluna) => {
     setFollowups((prev) => prev.map((f) => (f.id === id ? { ...f, coluna } : f)));
+    supabaseClient.from("followups").update({ coluna }).eq("id", id)
+      .then(() => {}).catch((e) => console.error("Falha ao mover follow-up:", e));
     if (coluna === "concluido" && googleToken) {
       const followup = followups.find((f) => f.id === id);
       if (followup?.googleEventId) {
@@ -819,10 +996,13 @@ export default function App() {
     const localId = uid();
     const novo = { ...followup, id: localId };
     setFollowups((prev) => [novo, ...prev]);
+    supabaseClient.from("followups").insert(followupToRow(novo))
+      .then(() => {}).catch((e) => console.error("Falha ao criar follow-up:", e));
     if (googleToken) {
       criarEventoGoogle(googleToken, followupParaGoogle(novo, nomeDoPaciente(novo.pacienteId)))
         .then((resultado) => {
           setFollowups((prev) => prev.map((f) => (f.id === localId ? { ...f, googleEventId: resultado.id } : f)));
+          supabaseClient.from("followups").update({ google_event_id: resultado.id }).eq("id", localId).then(() => {}).catch(() => {});
           logSync(`Follow-up sincronizado: ${novo.titulo}`);
         })
         .catch((err) => logSync(err.message, false));
@@ -849,26 +1029,19 @@ export default function App() {
     let criados = 0;
     pendentes.forEach((p) => {
       addFollowup({
-        pacienteId: p.id,
-        titulo: `Follow-up de prospecção — ${p.nome}`,
-        tipo: "Fazer follow-up",
-        prioridade: "media",
-        prazo,
-        coluna: "afazer",
-        responsavel: "Nutricionista"
+        pacienteId: p.id, titulo: `Follow-up de prospecção — ${p.nome}`, tipo: "Fazer follow-up",
+        prioridade: "media", prazo, coluna: "afazer", responsavel: "Nutricionista"
       });
       criados++;
     });
-    logSync(
-      criados > 0
-        ? `${criados} follow-up(s) de prospecção criado(s) para ${formatData(prazo)}.`
-        : "Todas as prospecções já têm um follow-up pendente."
-    );
+    logSync(criados > 0 ? `${criados} follow-up(s) de prospecção criado(s) para ${formatData(prazo)}.` : "Todas as prospecções já têm um follow-up pendente.");
   };
 
   const deleteFollowup = (id) => {
     const followup = followups.find((f) => f.id === id);
     setFollowups((prev) => prev.filter((f) => f.id !== id));
+    supabaseClient.from("followups").delete().eq("id", id)
+      .then(() => {}).catch((e) => console.error("Falha ao excluir follow-up:", e));
     if (googleToken && followup?.googleEventId) {
       excluirEventoGoogle(googleToken, followup.googleEventId)
         .then(() => logSync("Follow-up removido do Google Agenda."))
@@ -880,10 +1053,13 @@ export default function App() {
     const localId = uid();
     const novoEvento = { ...ev, id: localId };
     setEvents((prev) => [novoEvento, ...prev]);
+    supabaseClient.from("events").insert(eventToRow(novoEvento))
+      .then(() => {}).catch((e) => console.error("Falha ao criar evento:", e));
     if (googleToken) {
       criarEventoGoogle(googleToken, agendaEventoParaGoogle(novoEvento, nomeDoPaciente(novoEvento.pacienteId)))
         .then((resultado) => {
           setEvents((prev) => prev.map((e) => (e.id === localId ? { ...e, googleEventId: resultado.id } : e)));
+          supabaseClient.from("events").update({ google_event_id: resultado.id }).eq("id", localId).then(() => {}).catch(() => {});
           logSync(`Evento sincronizado: ${novoEvento.tipo} — ${nomeDoPaciente(novoEvento.pacienteId)}`);
         })
         .catch((err) => logSync(err.message, false));
@@ -894,12 +1070,12 @@ export default function App() {
     setEvents((prev) => {
       const atualizado = prev.map((e) => (e.id === id ? { ...e, ...patch } : e));
       const eventoAtualizado = atualizado.find((e) => e.id === id);
+      if (eventoAtualizado) {
+        supabaseClient.from("events").update(eventToRow(eventoAtualizado)).eq("id", id)
+          .then(() => {}).catch((e) => console.error("Falha ao salvar evento:", e));
+      }
       if (googleToken && eventoAtualizado?.googleEventId) {
-        atualizarEventoGoogle(
-          googleToken,
-          eventoAtualizado.googleEventId,
-          agendaEventoParaGoogle(eventoAtualizado, nomeDoPaciente(eventoAtualizado.pacienteId))
-        )
+        atualizarEventoGoogle(googleToken, eventoAtualizado.googleEventId, agendaEventoParaGoogle(eventoAtualizado, nomeDoPaciente(eventoAtualizado.pacienteId)))
           .then(() => logSync(`Evento atualizado no Google: ${eventoAtualizado.tipo} — ${nomeDoPaciente(eventoAtualizado.pacienteId)}`))
           .catch((err) => logSync(err.message, false));
       }
@@ -910,6 +1086,8 @@ export default function App() {
   const deleteEvent = (id) => {
     const evento = events.find((e) => e.id === id);
     setEvents((prev) => prev.filter((e) => e.id !== id));
+    supabaseClient.from("events").delete().eq("id", id)
+      .then(() => {}).catch((e) => console.error("Falha ao excluir evento:", e));
     if (googleToken && evento?.googleEventId) {
       excluirEventoGoogle(googleToken, evento.googleEventId)
         .then(() => logSync("Evento removido do Google Agenda."))
@@ -927,20 +1105,18 @@ export default function App() {
       try {
         const resultado = await criarEventoGoogle(googleToken, agendaEventoParaGoogle(ev, nomeDoPaciente(ev.pacienteId)));
         setEvents((prev) => prev.map((e) => (e.id === ev.id ? { ...e, googleEventId: resultado.id } : e)));
+        supabaseClient.from("events").update({ google_event_id: resultado.id }).eq("id", ev.id).then(() => {}).catch(() => {});
         sucesso++;
-      } catch (err) {
-        falhas++;
-      }
+      } catch (err) { falhas++; }
     }
     for (const f of followups) {
       if (f.googleEventId || f.coluna === "concluido") continue;
       try {
         const resultado = await criarEventoGoogle(googleToken, followupParaGoogle(f, nomeDoPaciente(f.pacienteId)));
         setFollowups((prev) => prev.map((x) => (x.id === f.id ? { ...x, googleEventId: resultado.id } : x)));
+        supabaseClient.from("followups").update({ google_event_id: resultado.id }).eq("id", f.id).then(() => {}).catch(() => {});
         sucesso++;
-      } catch (err) {
-        falhas++;
-      }
+      } catch (err) { falhas++; }
     }
     logSync(`Sincronização em massa concluída: ${sucesso} enviados, ${falhas} falharam.`, falhas === 0);
   };
@@ -989,7 +1165,7 @@ export default function App() {
         const tipoId = idade < 1 ? "introducao_alimentar" : idade < 4 ? "seletividade" : "trilhar";
         const tipoInfo = TIPOS_ACOMPANHAMENTO.find((t) => t.id === tipoId);
         atualizados++;
-        return {
+        const atualizado = {
           ...p,
           acompanhamento: {
             ...p.acompanhamento,
@@ -1002,6 +1178,8 @@ export default function App() {
             consultasTotal: tipoInfo.etapas.length || p.acompanhamento?.consultasTotal || 1
           }
         };
+        persistirPaciente(atualizado);
+        return atualizado;
       })
     );
     const semIdade = patients.filter(
@@ -1019,215 +1197,140 @@ export default function App() {
     setPatients(p);
     setFollowups(seedFollowups(p));
     setEvents(seedEvents(p));
+    supabaseClient.from("events").delete().neq("id", "").then(() => {}).catch((e) => console.error("Falha ao limpar eventos:", e));
+    supabaseClient.from("followups").delete().neq("id", "").then(() => {}).catch((e) => console.error("Falha ao limpar follow-ups:", e));
+    supabaseClient.from("patients").delete().neq("id", "").then(() => {}).catch((e) => console.error("Falha ao limpar pacientes:", e));
     logSync("Base de dados recarregada a partir do arquivo.");
   };
 
   const registrarConsultaHoje = (id) => {
     const hoje = new Date().toISOString().slice(0, 10);
-    setPatients((prev) =>
-      prev.map((p) => {
-        if (p.id !== id) return p;
-        const acomp = p.acompanhamento
-          ? {
-              ...p.acompanhamento,
-              consultasRealizadas: Math.min(
-                (p.acompanhamento.consultasRealizadas || 0) + 1,
-                p.acompanhamento.consultasTotal || (p.acompanhamento.consultasRealizadas || 0) + 1
-              )
-            }
-          : p.acompanhamento;
-        return {
-          ...p,
-          ultimoContato: hoje,
-          acompanhamento: acomp,
-          timeline: [...(p.timeline || []), { data: hoje, tipo: "consulta", texto: "Consulta registrada rapidamente." }]
-        };
-      })
-    );
+    setPatients((prev) => prev.map((p) => {
+      if (p.id !== id) return p;
+      const acomp = p.acompanhamento ? {
+        ...p.acompanhamento,
+        consultasRealizadas: Math.min((p.acompanhamento.consultasRealizadas || 0) + 1, p.acompanhamento.consultasTotal || (p.acompanhamento.consultasRealizadas || 0) + 1)
+      } : p.acompanhamento;
+      const atualizado = {
+        ...p, ultimoContato: hoje, acompanhamento: acomp,
+        timeline: [...(p.timeline || []), { data: hoje, tipo: "consulta", texto: "Consulta registrada rapidamente." }]
+      };
+      persistirPaciente(atualizado);
+      return atualizado;
+    }));
   };
 
   const addMedicao = (id, medicao) => {
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              evolucao: [...(p.evolucao || []), medicao],
-              timeline: [
-                ...(p.timeline || []),
-                { data: medicao.data, tipo: "nota", texto: `Nova medição: ${medicao.peso}kg / ${medicao.altura}cm.` }
-              ]
-            }
-          : p
-      )
-    );
+    setPatients((prev) => prev.map((p) => {
+      if (p.id !== id) return p;
+      const atualizado = {
+        ...p,
+        evolucao: [...(p.evolucao || []), medicao],
+        timeline: [...(p.timeline || []), { data: medicao.data, tipo: "nota", texto: `Nova medição: ${medicao.peso}kg / ${medicao.altura}cm.` }]
+      };
+      persistirPaciente(atualizado);
+      return atualizado;
+    }));
   };
 
   const addPagamento = (id, pagamento) => {
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              pagamentos: [...(p.pagamentos || []), pagamento],
-              timeline: [
-                ...(p.timeline || []),
-                {
-                  data: pagamento.data,
-                  tipo: "nota",
-                  texto: `Pagamento registrado: ${formatMoeda(pagamento.valor)} (${pagamento.formaPagamento}).`
-                }
-              ]
-            }
-          : p
-      )
-    );
+    setPatients((prev) => prev.map((p) => {
+      if (p.id !== id) return p;
+      const atualizado = {
+        ...p,
+        pagamentos: [...(p.pagamentos || []), pagamento],
+        timeline: [...(p.timeline || []), { data: pagamento.data, tipo: "nota", texto: `Pagamento registrado: ${formatMoeda(pagamento.valor)} (${pagamento.formaPagamento}).` }]
+      };
+      persistirPaciente(atualizado);
+      return atualizado;
+    }));
   };
 
   const addSessao = (id, sessao) => {
-    setPatients((prev) =>
-      prev.map((p) => {
-        if (p.id !== id) return p;
-        const acomp = p.acompanhamento
-          ? {
-              ...p.acompanhamento,
-              consultasRealizadas: Math.min(
-                (p.acompanhamento.consultasRealizadas || 0) + 1,
-                p.acompanhamento.consultasTotal || (p.acompanhamento.consultasRealizadas || 0) + 1
-              )
-            }
-          : p.acompanhamento;
-        return {
-          ...p,
-          ultimoContato: sessao.data,
-          acompanhamento: acomp,
-          sessoes: [...(p.sessoes || []), sessao],
-          timeline: [
-            ...(p.timeline || []),
-            { data: sessao.data, tipo: "consulta", texto: `${sessao.titulo} — ${sessao.notas || "sem observações"}` }
-          ]
-        };
-      })
-    );
+    setPatients((prev) => prev.map((p) => {
+      if (p.id !== id) return p;
+      const acomp = p.acompanhamento ? {
+        ...p.acompanhamento,
+        consultasRealizadas: Math.min((p.acompanhamento.consultasRealizadas || 0) + 1, p.acompanhamento.consultasTotal || (p.acompanhamento.consultasRealizadas || 0) + 1)
+      } : p.acompanhamento;
+      const atualizado = {
+        ...p, ultimoContato: sessao.data, acompanhamento: acomp,
+        sessoes: [...(p.sessoes || []), sessao],
+        timeline: [...(p.timeline || []), { data: sessao.data, tipo: "consulta", texto: `${sessao.titulo} — ${sessao.notas || "sem observações"}` }]
+      };
+      persistirPaciente(atualizado);
+      return atualizado;
+    }));
+
+    // Sincroniza a agenda: agenda automaticamente a próxima etapa pendente do plano,
+    // se ainda não houver um agendamento futuro criado para esse paciente.
+    const paciente = patients.find((p) => p.id === id);
+    if (paciente?.acompanhamento?.tipoId) {
+      const tipoInfo = TIPOS_ACOMPANHAMENTO.find((t) => t.id === paciente.acompanhamento.tipoId);
+      const hoje = new Date().toISOString().slice(0, 10);
+      const jaTemAgendamentoFuturo = events.some((e) => e.pacienteId === id && e.status === "agendado" && e.data >= hoje);
+      if (tipoInfo && !jaTemAgendamentoFuturo) {
+        const feitas = [...(paciente.sessoes || []).map((s) => s.titulo), sessao.titulo];
+        const proximaEtapa = tipoInfo.etapas.find((e) => !feitas.includes(e.titulo));
+        if (proximaEtapa) {
+          const dataBase = paciente.acompanhamento.dataInicio || sessao.data;
+          addEvent({
+            pacienteId: id,
+            data: addMesesData(dataBase, proximaEtapa.offsetMeses),
+            hora: "",
+            tipo: proximaEtapa.titulo,
+            status: "agendado",
+            obs: "Agendado automaticamente com base no plano de acompanhamento"
+          });
+        }
+      }
+    }
   };
 
   const setTipoAcompanhamento = (id, tipoId) => {
-    setPatients((prev) =>
-      prev.map((p) => {
-        if (p.id !== id) return p;
-        const tipoInfo = TIPOS_ACOMPANHAMENTO.find((t) => t.id === tipoId);
-        const dataInicio = p.acompanhamento?.dataInicio || new Date().toISOString().slice(0, 10);
-        const duracao = Math.max(tipoInfo?.duracaoMeses || 1, DURACAO_MINIMA_MESES);
-        const dataFim = addMesesData(dataInicio, duracao);
-        return {
-          ...p,
-          acompanhamento: {
-            ...p.acompanhamento,
-            tipoId,
-            tipo: tipoInfo?.label || "Consulta avulsa",
-            dataInicio,
-            dataFim,
-            consultasTotal: tipoInfo?.etapas?.length || p.acompanhamento?.consultasTotal || 1
-          }
-        };
-      })
-    );
+    mutarPaciente(id, (p) => {
+      const tipoInfo = TIPOS_ACOMPANHAMENTO.find((t) => t.id === tipoId);
+      const dataInicio = p.acompanhamento?.dataInicio || new Date().toISOString().slice(0, 10);
+      const duracao = Math.max(tipoInfo?.duracaoMeses || 1, DURACAO_MINIMA_MESES);
+      const dataFim = addMesesData(dataInicio, duracao);
+      return {
+        ...p,
+        acompanhamento: {
+          ...p.acompanhamento, tipoId, tipo: tipoInfo?.label || "Consulta avulsa",
+          dataInicio, dataFim, consultasTotal: tipoInfo?.etapas?.length || p.acompanhamento?.consultasTotal || 1
+        }
+      };
+    });
   };
 
-  const addRegistroAlimentar = (id, registro) => {
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? { ...p, registrosAlimentares: [...(p.registrosAlimentares || []), registro] }
-          : p
-      )
-    );
+  const setPlanoAcao = (id, planoAcao) => {
+    mutarPaciente(id, (p) => ({ ...p, planoAcao }));
   };
 
-  const deleteRegistroAlimentar = (id, registroId) => {
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? { ...p, registrosAlimentares: (p.registrosAlimentares || []).filter((r) => r.id !== registroId) }
-          : p
-      )
-    );
+  const addExame = (id, exame) => {
+    mutarPaciente(id, (p) => ({ ...p, exames: [...(p.exames || []), exame] }));
   };
 
-  const setPlanoAlimentar = (id, planoAlimentar) => {
-    setPatients((prev) => prev.map((p) => (p.id === id ? { ...p, planoAlimentar } : p)));
+  const deleteExame = (id, exameId) => {
+    mutarPaciente(id, (p) => ({ ...p, exames: (p.exames || []).filter((e) => e.id !== exameId) }));
+  };
+
+  const addMarcoAlimentar = (id, marco) => {
+    mutarPaciente(id, (p) => ({ ...p, marcosAlimentares: [...(p.marcosAlimentares || []), marco] }));
+  };
+
+  const deleteMarcoAlimentar = (id, marcoId) => {
+    mutarPaciente(id, (p) => ({ ...p, marcosAlimentares: (p.marcosAlimentares || []).filter((m) => m.id !== marcoId) }));
   };
 
   if (!loaded) {
-    return (
-      <div style={{ ...styles.root, alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: "#6E6355", fontFamily: "Lato, sans-serif" }}>Carregando…</div>
-      </div>
-    );
+    return <div style={{ ...styles.root, alignItems: "center", justifyContent: "center" }}>
+      <div style={{ color: "#6E6355", fontFamily: "Lato, sans-serif" }}>Carregando…</div>
+    </div>;
   }
 
   return (
     <div style={styles.root}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Lato:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; }
-        body { margin: 0; }
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-thumb { background: #D8CDBB; border-radius: 8px; }
-        button { font-family: inherit; cursor: pointer; }
-        input, select, textarea { font-family: inherit; }
-
-        .mobile-menu-btn { display: none; }
-
-        @media (max-width: 860px) {
-          .sidebar {
-            position: fixed !important; top: 0; left: 0; height: 100vh !important;
-            transform: translateX(-100%); transition: transform .25s ease;
-            z-index: 100 !important; width: 250px !important;
-            box-shadow: 8px 0 24px rgba(0,0,0,0.12);
-          }
-          .sidebar.mobile-open { transform: translateX(0); }
-          .sidebar-close-btn { display: flex !important; }
-          .mobile-menu-btn { display: flex !important; }
-          .header { padding: 14px 16px !important; }
-          .header-search { width: 100% !important; }
-          .header-date { display: none !important; }
-          .content { padding: 16px !important; }
-          .cards-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          .charts-grid { grid-template-columns: 1fr !important; }
-          .table-header { display: none !important; }
-          .table-row {
-            flex-direction: column !important; align-items: flex-start !important;
-            gap: 5px !important; padding: 14px 0 !important;
-          }
-          .table-row > div { width: 100% !important; }
-          .chevron-col { display: none !important; }
-          .table-row [data-label]::before {
-            content: attr(data-label); display: block; font-size: 10.5px;
-            text-transform: uppercase; letter-spacing: 0.4px; color: #9C9284; margin-bottom: 1px;
-          }
-          .drawer { width: 100% !important; max-width: 100% !important; }
-          .modal {
-            width: 100% !important; max-width: 100% !important;
-            height: 100% !important; max-height: 100% !important; border-radius: 0 !important;
-            margin: 0 !important;
-          }
-          .info-grid { grid-template-columns: 1fr !important; }
-          .new-patient-grid { grid-template-columns: 1fr !important; padding: 16px !important; }
-          .modal-footer { padding: 12px 16px !important; }
-          .drawer-header, .drawer-body { padding-left: 16px !important; padding-right: 16px !important; }
-          .drawer-tabs { padding: 0 16px !important; overflow-x: auto !important; }
-          .agenda-row { flex-wrap: wrap !important; }
-          .agenda-name { width: 100% !important; }
-          .evo-row { flex-wrap: wrap !important; row-gap: 3px !important; }
-          .evo-row > div { width: auto !important; }
-          .kanban-col { width: 220px !important; }
-        }
-        @media (max-width: 480px) {
-          .cards-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
-
       <Sidebar
         view={view}
         setView={(v) => { setView(v); setMobileNavOpen(false); }}
@@ -1236,50 +1339,19 @@ export default function App() {
         onClose={() => setMobileNavOpen(false)}
       />
       {mobileNavOpen && (
-        <div
-          onClick={() => setMobileNavOpen(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(134,122,110,0.35)", zIndex: 90 }}
-        />
+        <div onClick={() => setMobileNavOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(134,122,110,0.35)", zIndex: 90 }} />
       )}
-
       <div style={styles.main}>
         <Header query={query} setQuery={setQuery} onMenuClick={() => setMobileNavOpen(true)} />
-
         <div style={styles.content} className="content">
-          {view === "dashboard" && (
-            <Dashboard
-              patients={patients}
-              followups={followups}
-              setView={setView}
-              setSelectedId={setSelectedId}
-              setFiltroPacientesInicial={setFiltroPacientesInicial}
-            />
-          )}
-          {view === "patients" && (
-            <PatientsList
-              patients={filteredPatients}
-              onOpen={(id) => setSelectedId(id)}
-              onNew={() => setShowNewPatient(true)}
-              onQuickConsulta={registrarConsultaHoje}
-              onExportar={exportarPacientesExcel}
-              onImportar={importarPacientesExcel}
-              filtroInicial={filtroPacientesInicial}
-            />
-          )}
-          {view === "agenda" && (
-            <Agenda patients={patients} events={events} onAdd={addEvent} onUpdate={updateEvent} onDelete={deleteEvent} />
-          )}
-          {view === "followups" && (
-            <FollowupsBoard
-              followups={followups}
-              patients={patients}
-              onMove={moveFollowup}
-              onAdd={addFollowup}
-              onDelete={deleteFollowup}
-              onCriarProspeccao={criarFollowupsProspeccao}
-            />
-          )}
+          {view === "dashboard" && <Dashboard patients={patients} followups={followups} setView={setView} setSelectedId={setSelectedId} setFiltroPacientesInicial={setFiltroPacientesInicial} />}
+          {view === "patients" && <PatientsList patients={filteredPatients} onOpen={(id) => setSelectedId(id)} onNew={() => setShowNewPatient(true)} onQuickConsulta={registrarConsultaHoje} onExportar={exportarPacientesExcel} onImportar={importarPacientesExcel} filtroInicial={filtroPacientesInicial} />}
+          {view === "agenda" && <Agenda patients={patients} events={events} onAdd={addEvent} onUpdate={updateEvent} onDelete={deleteEvent} />}
+          {view === "followups" && <FollowupsBoard followups={followups} patients={patients} onMove={moveFollowup} onAdd={addFollowup} onDelete={deleteFollowup} onCriarProspeccao={criarFollowupsProspeccao} />}
           {view === "financeiro" && <Financeiro patients={patients} onAddPagamento={addPagamento} />}
+          {view === "administracao" && (
+            <Administracao patients={patients} contratosModelo={contratosModelo} setContratosModelo={setContratosModelo} />
+          )}
           {view === "integracoes" && (
             <Integracoes
               googleClientId={googleClientId}
@@ -1302,7 +1374,6 @@ export default function App() {
           )}
         </div>
       </div>
-
       {selectedPatient && (
         <PatientDetail
           patient={selectedPatient}
@@ -1314,24 +1385,20 @@ export default function App() {
           onAddSessao={(s) => addSessao(selectedPatient.id, s)}
           onSetTipoAcompanhamento={(tipoId) => setTipoAcompanhamento(selectedPatient.id, tipoId)}
           onDeletePatient={() => deletePatient(selectedPatient.id)}
-          onAddRegistroAlimentar={(r) => addRegistroAlimentar(selectedPatient.id, r)}
-          onDeleteRegistroAlimentar={(rid) => deleteRegistroAlimentar(selectedPatient.id, rid)}
-          onSetPlanoAlimentar={(p) => setPlanoAlimentar(selectedPatient.id, p)}
+          onSetPlanoAcao={(p) => setPlanoAcao(selectedPatient.id, p)}
+          onAddExame={(e) => addExame(selectedPatient.id, e)}
+          onDeleteExame={(eid) => deleteExame(selectedPatient.id, eid)}
+          onAddMarcoAlimentar={(m) => addMarcoAlimentar(selectedPatient.id, m)}
+          onDeleteMarcoAlimentar={(mid) => deleteMarcoAlimentar(selectedPatient.id, mid)}
         />
       )}
-
       {showNewPatient && (
-        <NewPatientModal
-          onClose={() => setShowNewPatient(false)}
-          onSave={(p) => {
-            addPatient(p);
-            setShowNewPatient(false);
-          }}
-        />
+        <NewPatientModal onClose={() => setShowNewPatient(false)} onSave={(p) => { addPatient(p); setShowNewPatient(false); }} />
       )}
     </div>
   );
 }
+
 
 /* ---------------------------------------------------------
    Sidebar
@@ -1339,10 +1406,11 @@ export default function App() {
 function Sidebar({ view, setView, onNewPatient, mobileOpen, onClose }) {
   const items = [
     { id: "dashboard", label: "Painel", icon: LayoutDashboard },
-    { id: "patients", label: "Pacientes", icon: Users },
+    { id: "patients", label: "Prontuário", icon: Users },
     { id: "agenda", label: "Agenda", icon: Calendar },
     { id: "followups", label: "Follow-up", icon: CheckSquare },
     { id: "financeiro", label: "Financeiro", icon: DollarSign },
+    { id: "administracao", label: "Administração", icon: FileText },
     { id: "integracoes", label: "Integrações", icon: Settings }
   ];
   return (
@@ -1501,9 +1569,9 @@ function Dashboard({ patients, followups, setView, setSelectedId, setFiltroPacie
       <div style={styles.cardsGrid} className="cards-grid">
         <MetricCard label="Pacientes ativos" value={ativos} icon={Users} accent="#918567"
           onClick={() => { setFiltroPacientesInicial("ativo"); setView("patients"); }} />
-        <MetricCard label="Em pausa" value={pausa} icon={Clock} accent="#AFA998"
+        <MetricCard label="Inativos" value={pausa} icon={Clock} accent="#AFA998"
           onClick={() => { setFiltroPacientesInicial("pausa"); setView("patients"); }} />
-        <MetricCard label="Concluídos" value={concluidos} icon={CheckSquare} accent="#9C9284"
+        <MetricCard label="Receberam alta" value={concluidos} icon={CheckSquare} accent="#9C9284"
           onClick={() => { setFiltroPacientesInicial("concluido"); setView("patients"); }} />
         <MetricCard label="Em prospecção" value={prospeccao} icon={MessageCircle} accent="#A99790"
           onClick={() => { setFiltroPacientesInicial("prospect"); setView("patients"); }} />
@@ -1647,8 +1715,8 @@ function PatientsList({ patients, onOpen, onNew, onQuickConsulta, onExportar, on
   const FILTROS = [
     { id: "todos", label: "Todos" },
     { id: "ativo", label: "Ativos" },
-    { id: "pausa", label: "Em pausa" },
-    { id: "concluido", label: "Concluídos" },
+    { id: "pausa", label: "Inativos" },
+    { id: "concluido", label: "Receberam alta" },
     { id: "prospect", label: "Prospecção" }
   ];
   const filtrados = filtroStatus === "todos" ? patients : patients.filter((p) => p.status === filtroStatus);
@@ -1657,7 +1725,7 @@ function PatientsList({ patients, onOpen, onNew, onQuickConsulta, onExportar, on
   return (
     <div>
       <SectionTitle
-        title="Pacientes"
+        title="Prontuário"
         subtitle={`${patients.length} pacientes encontrados`}
         action={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1785,8 +1853,7 @@ function StatusPill({ status }) {
 /* ---------------------------------------------------------
    Detalhe do paciente
 --------------------------------------------------------- */
-function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedicao, onAddPagamento, onAddSessao, onSetTipoAcompanhamento, onDeletePatient, onAddRegistroAlimentar, onDeleteRegistroAlimentar, onSetPlanoAlimentar }) {
-  const [tab, setTab] = useState("dados");
+function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedicao, onAddPagamento, onAddSessao, onSetTipoAcompanhamento, onDeletePatient, onSetPlanoAcao, onAddExame, onDeleteExame, onAddMarcoAlimentar, onDeleteMarcoAlimentar }) {
   const [showMedicaoForm, setShowMedicaoForm] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [showSessaoForm, setShowSessaoForm] = useState(false);
@@ -1794,10 +1861,12 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
   const [editForm, setEditForm] = useState(null);
   const [idadeAnosEdit, setIdadeAnosEdit] = useState("");
   const [curvaTipo, setCurvaTipo] = useState("peso");
-  const [showRegistroForm, setShowRegistroForm] = useState(false);
-  const [registroForm, setRegistroForm] = useState({ data: new Date().toISOString().slice(0, 10), texto: "" });
-  const [planoInput, setPlanoInput] = useState(patient.planoAlimentar || "");
-  const [planoSalvo, setPlanoSalvo] = useState(false);
+  const [planoAcaoInput, setPlanoAcaoInput] = useState(patient.planoAcao || "");
+  const [planoAcaoSalvo, setPlanoAcaoSalvo] = useState(false);
+  const [showExameForm, setShowExameForm] = useState(false);
+  const [exameForm, setExameForm] = useState({ data: new Date().toISOString().slice(0, 10), nome: "", resultado: "", categoria: "normal" });
+  const [showMarcoForm, setShowMarcoForm] = useState(false);
+  const [marcoForm, setMarcoForm] = useState({ data: new Date().toISOString().slice(0, 10), texto: "" });
   const [idadeMesesEdit, setIdadeMesesEdit] = useState("");
   const [medicao, setMedicao] = useState({
     peso: "", altura: "", data: new Date().toISOString().slice(0, 10), obs: ""
@@ -1805,13 +1874,6 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
   const [sessaoForm, setSessaoForm] = useState({
     titulo: "", data: new Date().toISOString().slice(0, 10), notas: ""
   });
-  const tabs = [
-    { id: "dados", label: "Dados", icon: FileText },
-    { id: "timeline", label: "Timeline", icon: Clock },
-    { id: "consultas", label: "Consultas", icon: Activity },
-    { id: "alimentacao", label: "Alimentação", icon: Apple },
-    { id: "acompanhamento", label: "Acompanhamento", icon: Stethoscope }
-  ];
 
   const tipoInfo =
     TIPOS_ACOMPANHAMENTO.find((t) => t.id === patient.acompanhamento?.tipoId) ||
@@ -1865,17 +1927,24 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
     setShowMedicaoForm(false);
   };
 
-  const salvarRegistroAlimentar = () => {
-    if (!registroForm.texto.trim()) return;
-    onAddRegistroAlimentar({ id: uid(), data: registroForm.data, texto: registroForm.texto });
-    setRegistroForm({ data: new Date().toISOString().slice(0, 10), texto: "" });
-    setShowRegistroForm(false);
+  const salvarPlanoAcao = () => {
+    onSetPlanoAcao(planoAcaoInput);
+    setPlanoAcaoSalvo(true);
+    setTimeout(() => setPlanoAcaoSalvo(false), 2000);
   };
 
-  const salvarPlanoAlimentar = () => {
-    onSetPlanoAlimentar(planoInput);
-    setPlanoSalvo(true);
-    setTimeout(() => setPlanoSalvo(false), 2000);
+  const salvarExame = () => {
+    if (!exameForm.nome.trim()) return;
+    onAddExame({ id: uid(), ...exameForm });
+    setExameForm({ data: new Date().toISOString().slice(0, 10), nome: "", resultado: "", categoria: "normal" });
+    setShowExameForm(false);
+  };
+
+  const salvarMarcoAlimentar = () => {
+    if (!marcoForm.texto.trim()) return;
+    onAddMarcoAlimentar({ id: uid(), ...marcoForm });
+    setMarcoForm({ data: new Date().toISOString().slice(0, 10), texto: "" });
+    setShowMarcoForm(false);
   };
 
   const salvarSessao = () => {
@@ -1903,6 +1972,9 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
       whatsapp: patient.whatsapp || "",
       email: patient.email || "",
       endereco: patient.endereco || "",
+      dificuldadeAlimentar: patient.dificuldadeAlimentar || "",
+      corFavorita: patient.corFavorita || "",
+      personagensFavoritos: patient.personagensFavoritos || "",
       tags: (patient.tags || []).join(", ")
     });
     setIdadeAnosEdit("");
@@ -1933,32 +2005,15 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
             </div>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
-            {tab === "dados" && !editMode && (
+            {!editMode && (
               <button title="Editar dados" style={styles.iconBtn} onClick={iniciarEdicao}><Pencil size={16} /></button>
             )}
             <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
           </div>
         </div>
 
-        <div className="drawer-tabs" style={{ display: "flex", gap: 6, padding: "0 24px", borderBottom: "1px solid #E3DACB" }}>
-          {tabs.map((t) => {
-            const Icon = t.icon;
-            const active = tab === t.id;
-            return (
-              <div key={t.id} onClick={() => setTab(t.id)} style={{
-                display: "flex", alignItems: "center", gap: 6, padding: "10px 12px",
-                fontSize: 13, fontWeight: 600, cursor: "pointer",
-                color: active ? "#867A6E" : "#9C9284",
-                borderBottom: active ? "2px solid #867A6E" : "2px solid transparent"
-              }}>
-                <Icon size={14} /> {t.label}
-              </div>
-            );
-          })}
-        </div>
-
         <div className="drawer-body" style={{ padding: 24, overflowY: "auto", flex: 1 }}>
-          {tab === "dados" && !editMode && (
+          {!editMode && (
             <div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
                 <button onClick={onQuickConsulta} style={styles.secondaryBtn}>
@@ -2019,11 +2074,18 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
 
               <InfoGrid items={[
                 ["Data de nascimento", formatData(patient.dataNascimento)],
+                ["Idade", calcIdade(patient.dataNascimento)],
                 ["Sexo", patient.sexo === "F" ? "Feminino" : "Masculino"],
+                ["Peso atual", patient.evolucao?.length ? `${patient.evolucao[patient.evolucao.length - 1].peso} kg` : "-"],
+                ["Altura atual", patient.evolucao?.length ? `${patient.evolucao[patient.evolucao.length - 1].altura} cm` : "-"],
                 ["Escola", patient.escola],
+                ["Diagnóstico", patient.diagnostico],
+                ["Dificuldade alimentar", patient.dificuldadeAlimentar],
                 ["Alergias", patient.alergias],
                 ["Medicamentos", patient.medicamentos],
                 ["Pediatra", patient.pediatra],
+                ["Cor favorita", patient.corFavorita],
+                ["Personagens favoritos", patient.personagensFavoritos],
                 ["Origem", patient.origem]
               ]} />
               <div style={styles.divider} />
@@ -2071,7 +2133,7 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
             </div>
           )}
 
-          {tab === "dados" && editMode && editForm && (
+          {editMode && editForm && (
             <div>
               <div className="new-patient-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <Field label="Nome da criança" value={editForm.nome} onChange={(v) => setEditForm((f) => ({ ...f, nome: v }))} full />
@@ -2132,10 +2194,13 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                   onChange={(v) => setEditForm((f) => ({ ...f, origem: v }))}
                 />
                 <Field label="Diagnóstico" value={editForm.diagnostico} onChange={(v) => setEditForm((f) => ({ ...f, diagnostico: v }))} full />
+                <Field label="Dificuldade alimentar" value={editForm.dificuldadeAlimentar} onChange={(v) => setEditForm((f) => ({ ...f, dificuldadeAlimentar: v }))} full />
                 <Field label="Alergias" value={editForm.alergias} onChange={(v) => setEditForm((f) => ({ ...f, alergias: v }))} />
                 <Field label="Medicamentos" value={editForm.medicamentos} onChange={(v) => setEditForm((f) => ({ ...f, medicamentos: v }))} />
                 <Field label="Escola" value={editForm.escola} onChange={(v) => setEditForm((f) => ({ ...f, escola: v }))} />
                 <Field label="Pediatra" value={editForm.pediatra} onChange={(v) => setEditForm((f) => ({ ...f, pediatra: v }))} />
+                <Field label="Cor favorita" value={editForm.corFavorita} onChange={(v) => setEditForm((f) => ({ ...f, corFavorita: v }))} />
+                <Field label="Personagens favoritos" value={editForm.personagensFavoritos} onChange={(v) => setEditForm((f) => ({ ...f, personagensFavoritos: v }))} />
                 <Field label="Responsável" value={editForm.responsavel} onChange={(v) => setEditForm((f) => ({ ...f, responsavel: v }))} full />
                 <Field label="Telefone" value={editForm.telefone} onChange={(v) => setEditForm((f) => ({ ...f, telefone: maskTelefone(v) }))} />
                 <Field label="WhatsApp" value={editForm.whatsapp} onChange={(v) => setEditForm((f) => ({ ...f, whatsapp: maskTelefone(v) }))} />
@@ -2162,24 +2227,8 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
             </div>
           )}
 
-          {tab === "timeline" && (
-            <div>
-              {(patient.timeline || []).slice().reverse().map((ev, i) => (
-                <div key={i} style={styles.timelineItem}>
-                  <div style={styles.timelineDot} />
-                  <div>
-                    <div style={{ fontSize: 12, color: "#9C9284" }}>{formatData(ev.data)} · {ev.tipo}</div>
-                    <div style={{ fontSize: 14, color: "#867A6E" }}>{ev.texto}</div>
-                  </div>
-                </div>
-              ))}
-              {(!patient.timeline || patient.timeline.length === 0) && (
-                <div style={styles.emptyRow}>Nenhum evento registrado ainda.</div>
-              )}
-            </div>
-          )}
-
-          {tab === "consultas" && (
+          <div style={styles.divider} />
+          {(
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 14 }}>
                 <div>
@@ -2339,59 +2388,148 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
             </div>
           )}
 
-          {tab === "alimentacao" && (
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <div style={styles.miniTitle}>Registro alimentar (recordatório)</div>
-                <button style={styles.secondaryBtn} onClick={() => setShowRegistroForm((v) => !v)}>
-                  <Plus size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Adicionar registro
-                </button>
+          {(
+            <div style={{ marginTop: 24 }}>
+              <div style={styles.divider} />
+              <div style={styles.miniTitle}>Plano de ação</div>
+              <div style={{ fontSize: 12, color: "#9C9284", marginBottom: 8 }}>
+                Estratégia atual montada para essa criança (metas, orientações, próximos passos).
+              </div>
+              <textarea
+                value={planoAcaoInput}
+                onChange={(e) => setPlanoAcaoInput(e.target.value)}
+                placeholder="Ex.: Introduzir 1 legume novo por semana, manter horários fixos de refeição, evitar telas durante as refeições..."
+                style={{ ...styles.input, minHeight: 90, resize: "vertical", fontFamily: "Lato, sans-serif" }}
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                <button style={styles.secondaryBtn} onClick={salvarPlanoAcao}>Salvar plano de ação</button>
+                {planoAcaoSalvo && <span style={{ fontSize: 12, color: "#918567", fontWeight: 600 }}>Salvo ✓</span>}
               </div>
 
-              {showRegistroForm && (
+              <div style={styles.divider} />
+              <div style={styles.miniTitle}>Evolução de peso</div>
+              {!patient.dataNascimento ? (
+                <div style={styles.emptyRow}>Cadastre a data de nascimento para ver a evolução de peso.</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={dadosCurva}>
+                    <CartesianGrid stroke="#E3DACB" vertical={false} />
+                    <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "#9C9284" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: "#9C9284" }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #E3DACB", fontSize: 12 }} />
+                    <Line type="monotone" dataKey="paciente" stroke="#918567" strokeWidth={2} dot={{ r: 4 }} connectNulls name="Peso (kg)" />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+
+              <div style={styles.divider} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={styles.miniTitle}>Evolução de exames</div>
+                <button style={styles.secondaryBtn} onClick={() => setShowExameForm((v) => !v)}>
+                  <Plus size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Adicionar exame
+                </button>
+              </div>
+              {showExameForm && (
                 <div style={{ ...styles.panel, marginBottom: 16 }}>
-                  <Field label="Data" type="date" value={registroForm.data} onChange={(v) => setRegistroForm((f) => ({ ...f, data: v }))} />
-                  <div style={{ marginTop: 12 }}>
-                    <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>
-                      O que a criança comeu num dia típico
-                    </div>
-                    <textarea
-                      value={registroForm.texto}
-                      onChange={(e) => setRegistroForm((f) => ({ ...f, texto: e.target.value }))}
-                      placeholder="Ex.: Café da manhã: leite + pão. Almoço: arroz, feijão, frango, recusa verduras. Lanche: fruta. Jantar: repete o almoço."
-                      style={{ ...styles.input, minHeight: 90, resize: "vertical", fontFamily: "Lato, sans-serif" }}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <Field label="Data" type="date" value={exameForm.data} onChange={(v) => setExameForm((f) => ({ ...f, data: v }))} />
+                    <Field
+                      label="Categoria" type="select"
+                      options={["Normal", "Atenção", "Alterado"]}
+                      value={CATEGORIA_EXAME[exameForm.categoria]?.label}
+                      onChange={(label) => setExameForm((f) => ({ ...f, categoria: Object.keys(CATEGORIA_EXAME).find((k) => CATEGORIA_EXAME[k].label === label) }))}
                     />
+                    <Field label="Exame" value={exameForm.nome} onChange={(v) => setExameForm((f) => ({ ...f, nome: v }))} full />
+                    <Field label="Resultado / observação" value={exameForm.resultado} onChange={(v) => setExameForm((f) => ({ ...f, resultado: v }))} full />
                   </div>
                   <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-                    <button style={styles.secondaryBtn} onClick={() => setShowRegistroForm(false)}>Cancelar</button>
-                    <button style={styles.primaryBtn} onClick={salvarRegistroAlimentar}>Salvar registro</button>
+                    <button style={styles.secondaryBtn} onClick={() => setShowExameForm(false)}>Cancelar</button>
+                    <button style={styles.primaryBtn} onClick={salvarExame}>Salvar exame</button>
                   </div>
                 </div>
               )}
-
-              {(!patient.registrosAlimentares || patient.registrosAlimentares.length === 0) ? (
-                <div style={styles.emptyRow}>Nenhum registro alimentar ainda.</div>
+              {(!patient.exames || patient.exames.length === 0) ? (
+                <div style={styles.emptyRow}>Nenhum exame registrado ainda.</div>
               ) : (
-                patient.registrosAlimentares.slice().reverse().map((r) => (
-                  <div key={r.id} style={{ padding: "12px 0", borderBottom: "1px solid #E3DACB" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div style={{ fontSize: 12, color: "#9C9284", fontWeight: 600 }}>{formatData(r.data)}</div>
-                      <button
-                        onClick={() => { if (window.confirm("Excluir este registro alimentar?")) onDeleteRegistroAlimentar(r.id); }}
-                        style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", display: "flex", padding: 0 }}
-                      >
+                patient.exames.slice().reverse().map((ex) => (
+                  <div key={ex.id} style={{ padding: "10px 0", borderBottom: "1px solid #E3DACB", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#867A6E" }}>{ex.nome}</div>
+                      <div style={{ fontSize: 12.5, color: "#6E6355", marginTop: 2 }}>{ex.resultado}</div>
+                      <div style={{ fontSize: 11.5, color: "#9C9284", marginTop: 2 }}>{formatData(ex.data)}</div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 10,
+                        background: (CATEGORIA_EXAME[ex.categoria]?.color || "#918567") + "22",
+                        color: CATEGORIA_EXAME[ex.categoria]?.color || "#918567"
+                      }}>
+                        {CATEGORIA_EXAME[ex.categoria]?.label || "Normal"}
+                      </span>
+                      <button onClick={() => { if (window.confirm("Excluir este exame?")) onDeleteExame(ex.id); }}
+                        style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", display: "flex", padding: 0 }}>
                         <Trash2 size={13} />
                       </button>
                     </div>
-                    <div style={{ fontSize: 13.5, color: "#4B615D", marginTop: 4, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{r.texto}</div>
                   </div>
                 ))
+              )}
+
+              <div style={styles.divider} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={styles.miniTitle}>Evolução alimentar</div>
+                <button style={styles.secondaryBtn} onClick={() => setShowMarcoForm((v) => !v)}>
+                  <Plus size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Adicionar marco
+                </button>
+              </div>
+              {showMarcoForm && (
+                <div style={{ ...styles.panel, marginBottom: 16 }}>
+                  <Field label="Data" type="date" value={marcoForm.data} onChange={(v) => setMarcoForm((f) => ({ ...f, data: v }))} />
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>O que mudou</div>
+                    <textarea
+                      value={marcoForm.texto}
+                      onChange={(e) => setMarcoForm((f) => ({ ...f, texto: e.target.value }))}
+                      placeholder="Ex.: Passou a aceitar 5 legumes diferentes. Consumo de água subiu para +1L/dia. Reduziu doces. Começou atividade física 2x/semana."
+                      style={{ ...styles.input, minHeight: 70, resize: "vertical", fontFamily: "Lato, sans-serif" }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+                    <button style={styles.secondaryBtn} onClick={() => setShowMarcoForm(false)}>Cancelar</button>
+                    <button style={styles.primaryBtn} onClick={salvarMarcoAlimentar}>Salvar marco</button>
+                  </div>
+                </div>
+              )}
+              {(!patient.marcosAlimentares || patient.marcosAlimentares.length === 0) ? (
+                <div style={styles.emptyRow}>Nenhum marco de evolução alimentar registrado ainda.</div>
+              ) : (
+                <div style={{ position: "relative", paddingLeft: 18 }}>
+                  {patient.marcosAlimentares.slice().reverse().map((m, i) => (
+                    <div key={m.id} style={{ position: "relative", paddingBottom: 16 }}>
+                      <div style={{
+                        position: "absolute", left: -18, top: 4, width: 8, height: 8, borderRadius: "50%", background: "#918567"
+                      }} />
+                      {i < patient.marcosAlimentares.length - 1 && (
+                        <div style={{ position: "absolute", left: -15, top: 12, width: 1, height: "100%", background: "#E3DACB" }} />
+                      )}
+                      <div style={{ fontSize: 11.5, color: "#9C9284", fontWeight: 600 }}>{formatData(m.data)}</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                        <div style={{ fontSize: 13.5, color: "#4B615D", marginTop: 2, lineHeight: 1.6 }}>{m.texto}</div>
+                        <button onClick={() => { if (window.confirm("Excluir este marco?")) onDeleteMarcoAlimentar(m.id); }}
+                          style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", display: "flex", padding: 0, flexShrink: 0 }}>
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}
 
-          {tab === "acompanhamento" && patient.acompanhamento && (
-            <div>
+          {patient.acompanhamento && (
+            <div style={{ marginTop: 24 }}>
+              <div style={styles.divider} />
               <div style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>
                   Tipo de acompanhamento
@@ -2415,26 +2553,6 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                 ["Valor total", formatMoeda(patient.acompanhamento.valor)],
                 ["Forma de pagamento", `${patient.acompanhamento.formaPagamento} · ${patient.acompanhamento.parcelas}x`]
               ]} />
-              <div style={styles.divider} />
-              <div style={styles.miniTitle}>Plano alimentar vigente</div>
-              <div style={{ fontSize: 12, color: "#9C9284", marginBottom: 8 }}>
-                Cole o link do documento (Drive, PDF, etc.) ou descreva o plano atual.
-              </div>
-              <textarea
-                value={planoInput}
-                onChange={(e) => setPlanoInput(e.target.value)}
-                placeholder="Ex.: https://drive.google.com/... ou a descrição do plano"
-                style={{ ...styles.input, minHeight: 70, resize: "vertical", fontFamily: "Lato, sans-serif" }}
-              />
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
-                <button style={styles.secondaryBtn} onClick={salvarPlanoAlimentar}>Salvar plano</button>
-                {planoSalvo && <span style={{ fontSize: 12, color: "#918567", fontWeight: 600 }}>Salvo ✓</span>}
-                {/^https?:\/\//.test(patient.planoAlimentar || "") && (
-                  <a href={patient.planoAlimentar} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: "#867A6E", fontWeight: 600 }}>
-                    Abrir link atual ↗
-                  </a>
-                )}
-              </div>
               <div style={styles.divider} />
               <div style={styles.miniTitle}>Status do acompanhamento</div>
               <StatusPill status={patient.status} />
@@ -2500,6 +2618,7 @@ function NewPatientModal({ onClose, onSave }) {
     nome: "", dataNascimento: "", sexo: "F", escola: "", diagnostico: "",
     alergias: "", medicamentos: "", pediatra: "", responsavel: "",
     telefone: "", whatsapp: "", email: "", endereco: "", tags: "", origem: "",
+    dificuldadeAlimentar: "", corFavorita: "", personagensFavoritos: "",
     status: "ativo", ultimoContato: new Date().toISOString().slice(0, 10)
   });
   const [whatsappIgual, setWhatsappIgual] = useState(true);
@@ -2608,10 +2727,13 @@ function NewPatientModal({ onClose, onSave }) {
           {showMais && (
             <>
               <Field label="Diagnóstico" value={form.diagnostico} onChange={(v) => set("diagnostico", v)} full />
+              <Field label="Dificuldade alimentar" value={form.dificuldadeAlimentar} onChange={(v) => set("dificuldadeAlimentar", v)} full />
               <Field label="Alergias" value={form.alergias} onChange={(v) => set("alergias", v)} />
               <Field label="Medicamentos" value={form.medicamentos} onChange={(v) => set("medicamentos", v)} />
               <Field label="Escola" value={form.escola} onChange={(v) => set("escola", v)} />
               <Field label="Pediatra" value={form.pediatra} onChange={(v) => set("pediatra", v)} />
+              <Field label="Cor favorita" value={form.corFavorita} onChange={(v) => set("corFavorita", v)} />
+              <Field label="Personagens favoritos" value={form.personagensFavoritos} onChange={(v) => set("personagensFavoritos", v)} />
               <Field label="E-mail" value={form.email} onChange={(v) => set("email", v)} />
               <Field label="Endereço" value={form.endereco} onChange={(v) => set("endereco", v)} />
               <Field label="Origem" type="select" options={["", ...ORIGEM_OPCOES]} value={form.origem} onChange={(v) => set("origem", v)} />
@@ -3042,6 +3164,123 @@ function Financeiro({ patients, onAddPagamento }) {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function Administracao({ patients, contratosModelo, setContratosModelo }) {
+  const [tipoAtivo, setTipoAtivo] = useState("introducao_alimentar");
+  const [pacienteSelecionadoId, setPacienteSelecionadoId] = useState("");
+  const [textoGerado, setTextoGerado] = useState("");
+
+  const salvarModelo = (texto) => {
+    setContratosModelo((prev) => ({ ...prev, [tipoAtivo]: texto }));
+  };
+
+  const gerarContrato = () => {
+    const p = patients.find((pt) => pt.id === pacienteSelecionadoId);
+    if (!p) return;
+    const acomp = p.acompanhamento || {};
+    const tipoId = acomp.tipoId || "avulso";
+    const modelo = contratosModelo[tipoId] || CONTRATOS_PADRAO.avulso;
+    const duracaoTipo = TIPOS_ACOMPANHAMENTO.find((t) => t.id === tipoId)?.duracaoMeses;
+    const texto = modelo
+      .split("{{nome}}").join(p.nome || "")
+      .split("{{responsavel}}").join(p.responsavel || "")
+      .split("{{duracao}}").join(String(duracaoTipo || ""))
+      .split("{{dataInicio}}").join(formatData(acomp.dataInicio))
+      .split("{{dataFim}}").join(formatData(acomp.dataFim))
+      .split("{{valor}}").join(formatMoeda(acomp.valor))
+      .split("{{formaPagamento}}").join(acomp.formaPagamento || "")
+      .split("{{parcelas}}").join(String(acomp.parcelas || 1));
+    setTextoGerado(texto);
+  };
+
+  const copiarTexto = () => {
+    if (navigator.clipboard) navigator.clipboard.writeText(textoGerado);
+  };
+
+  const todosPagamentos = patients
+    .flatMap((p) => (p.pagamentos || []).map((pg) => ({ ...pg, pacienteNome: p.nome })))
+    .sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+
+  return (
+    <div>
+      <SectionTitle title="Administração" subtitle="Termos de compromisso e comprovantes de pagamento" />
+
+      <div style={styles.panel}>
+        <div style={styles.panelTitle}>Modelos de termo de compromisso</div>
+        <div style={{ fontSize: 12, color: "#A99790", marginBottom: 14, lineHeight: 1.6 }}>
+          Estes modelos são um ponto de partida editável — não substituem aconselhamento jurídico.
+          Recomendamos revisão por um advogado antes de usar com os responsáveis.
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+          {TIPOS_ACOMPANHAMENTO.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTipoAtivo(t.id)}
+              style={{
+                padding: "6px 14px", borderRadius: 20, fontSize: 12.5, fontWeight: 600, cursor: "pointer",
+                border: `1px solid ${tipoAtivo === t.id ? "#867A6E" : "#E3DACB"}`,
+                background: tipoAtivo === t.id ? "#867A6E" : "#FFFFFF",
+                color: tipoAtivo === t.id ? "#FFFFFF" : "#6E6355"
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <textarea
+          value={contratosModelo[tipoAtivo] || ""}
+          onChange={(e) => salvarModelo(e.target.value)}
+          style={{ ...styles.input, minHeight: 260, resize: "vertical", fontFamily: "monospace", fontSize: 12.5, lineHeight: 1.6 }}
+        />
+        <div style={{ fontSize: 11.5, color: "#9C9284", marginTop: 8 }}>
+          Use {"{{nome}}"}, {"{{responsavel}}"}, {"{{duracao}}"}, {"{{dataInicio}}"} e {"{{dataFim}}"} —
+          são preenchidos automaticamente ao gerar o termo de um paciente.
+        </div>
+      </div>
+
+      <div style={styles.panel}>
+        <div style={styles.panelTitle}>Gerar termo para um paciente</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>Paciente</div>
+            <select value={pacienteSelecionadoId} onChange={(e) => setPacienteSelecionadoId(e.target.value)} style={styles.input}>
+              <option value="">Selecione...</option>
+              {patients.filter((p) => p.status !== "prospect").map((p) => (
+                <option key={p.id} value={p.id}>{p.nome}</option>
+              ))}
+            </select>
+          </div>
+          <button style={styles.primaryBtn} onClick={gerarContrato} disabled={!pacienteSelecionadoId}>Gerar termo</button>
+        </div>
+        {textoGerado && (
+          <div style={{ marginTop: 16 }}>
+            <textarea
+              readOnly
+              value={textoGerado}
+              style={{ ...styles.input, minHeight: 260, resize: "vertical", fontFamily: "monospace", fontSize: 12.5, lineHeight: 1.6 }}
+            />
+            <button style={{ ...styles.secondaryBtn, marginTop: 8 }} onClick={copiarTexto}>Copiar texto</button>
+          </div>
+        )}
+      </div>
+
+      <div style={styles.panel}>
+        <div style={styles.panelTitle}>Comprovantes (pagamentos registrados)</div>
+        {todosPagamentos.length === 0 ? (
+          <div style={styles.emptyRow}>Nenhum pagamento registrado ainda.</div>
+        ) : (
+          todosPagamentos.slice(0, 50).map((pg, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #E3DACB", fontSize: 13 }}>
+              <span style={{ color: "#867A6E", fontWeight: 600 }}>{pg.pacienteNome}</span>
+              <span style={{ color: "#6E6355" }}>{formatData(pg.data)}</span>
+              <span style={{ color: "#918567", fontWeight: 600 }}>{formatMoeda(pg.valor)}</span>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
