@@ -11,7 +11,7 @@
 <script src="https://unpkg.com/prop-types@15/prop-types.min.js"></script>
 <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Lato:wght@400;500;600;700&display=swap');
@@ -579,6 +579,15 @@ const GrowthMark = ({ size = 28 }) => (
 --------------------------------------------------------- */
 const SUPABASE_URL = "https://vfclzwrmfzogdpeclxrx.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmY2x6d3JtZnpvZ2RwZWNseHJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0ODA5NjYsImV4cCI6MjEwNTA1Njk2Nn0.lkzdAd8JYRXsqKaAUjBHn2HyKr2Dj9H_PIrTLFUUiqM";
+if (!window.supabase) {
+  document.getElementById("root").innerHTML =
+    '<div style="padding:40px;font-family:sans-serif;color:#867A6E;max-width:500px;margin:0 auto;text-align:center">' +
+    '<h2>Não foi possível carregar uma parte do site</h2>' +
+    '<p>A biblioteca de conexão com o banco de dados não carregou (pode ser a internet no momento). ' +
+    'Tente recarregar a página (puxe pra baixo ou aperte F5). Se continuar assim, avise a Bárbara.</p>' +
+    '</div>';
+  throw new Error("Biblioteca do Supabase não carregou.");
+}
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Conversão entre o formato do CRM (camelCase) e as colunas do banco (snake_case)
