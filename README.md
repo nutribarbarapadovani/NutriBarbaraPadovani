@@ -111,11 +111,10 @@ Na tela **Integrações**, é possível conectar o CRM à conta Google da Bárba
 
 ### Segurança, backup e produtividade (atualização mais recente)
 
-- **Senha de acesso**: o CRM agora pede uma senha antes de mostrar qualquer dado de paciente. No primeiro acesso, a Bárbara define a senha; depois disso, fica pedindo login a cada nova sessão do navegador. É uma proteção básica (client-side, hash SHA-256) — não substitui um backend com autenticação de verdade, mas já impede acesso casual por quem tiver o link.
 - **Backup completo (.json)**: em Integrações, dá pra baixar um arquivo com todos os pacientes, agenda e follow-ups, e restaurar depois (útil se o navegador for limpo ou o aparelho trocar).
 - **Filtros e paginação em Pacientes**: abas por status (Ativos/Em pausa/Concluídos/Prospecção) com contador, e "Carregar mais" em vez de listar tudo de uma vez — importante agora que a base passou de 150 pacientes.
 - **Confirmação prévia** antes de criar follow-ups em massa para prospecções, mostrando quantos serão criados.
 - **Mensagens de erro mais claras** quando a conexão com o Google Agenda expira, indicando exatamente o que fazer.
 - **Classificação em massa por idade**: em Integrações, um botão sugere automaticamente o tipo de acompanhamento (Introdução Alimentar/Seletividade/Trilhar) para pacientes que já têm data de nascimento cadastrada e ainda não têm um tipo definido.
 
-**Limitação importante sobre a senha**: como este é um app 100% estático (sem servidor), a senha protege contra acesso casual via link, mas qualquer pessoa com conhecimento técnico e acesso ao código-fonte do site consegue contornar essa proteção. Para dados de saúde realmente sensíveis, o ideal a médio prazo é migrar para um backend com autenticação de verdade (ex: Supabase, já mencionado como próximo passo na seção de identidade visual).
+**Nota sobre acesso**: o CRM não tem senha de login — o link fica aberto para quem o acessar. Se no futuro isso precisar mudar (por exemplo, por exigência de proteção de dados de saúde), o caminho recomendado é migrar para um backend com autenticação de verdade (ex: Supabase), já que qualquer proteção puramente no navegador (sem servidor) pode ser contornada por alguém com conhecimento técnico.

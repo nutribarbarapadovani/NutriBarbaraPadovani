@@ -1,131 +1,15 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Bárbara Sales — Nutrição Materno-Infantil</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23867A6E'/%3E%3Ctext x='16' y='21.5' font-family='Georgia, Times New Roman, serif' font-size='14' font-weight='600' fill='%23F6F0E7' text-anchor='middle'%3EBS%3C/text%3E%3C/svg%3E" />
-
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/prop-types@15/prop-types.min.js"></script>
-<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
-<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
-
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Lato:wght@400;500;600;700&display=swap');
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #F6F0E7; }
-  #root { min-height: 100vh; }
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-thumb { background: #D8CDBB; border-radius: 8px; }
-  button { font-family: inherit; cursor: pointer; }
-  input, select, textarea { font-family: inherit; }
-  #loading {
-    display: flex; align-items: center; justify-content: center; height: 100vh;
-    font-family: Lato, sans-serif; color: #6E6355; font-size: 14px;
-  }
-
-  .mobile-menu-btn { display: none; }
-
-  @media (max-width: 860px) {
-    .sidebar {
-      position: fixed !important; top: 0; left: 0; height: 100vh !important;
-      transform: translateX(-100%); transition: transform .25s ease;
-      z-index: 100 !important; width: 250px !important;
-      box-shadow: 8px 0 24px rgba(0,0,0,0.12);
-    }
-    .sidebar.mobile-open { transform: translateX(0); }
-    .sidebar-close-btn { display: flex !important; }
-    .mobile-menu-btn { display: flex !important; }
-    .header { padding: 14px 16px !important; }
-    .header-search { width: 100% !important; }
-    .header-date { display: none !important; }
-    .content { padding: 16px !important; }
-    .cards-grid { grid-template-columns: repeat(2, 1fr) !important; }
-    .charts-grid { grid-template-columns: 1fr !important; }
-    .table-header { display: none !important; }
-    .table-row {
-      flex-direction: column !important; align-items: flex-start !important;
-      gap: 5px !important; padding: 14px 0 !important;
-    }
-    .table-row > div { width: 100% !important; }
-    .chevron-col { display: none !important; }
-    .table-row [data-label]::before {
-      content: attr(data-label); display: block; font-size: 10.5px;
-      text-transform: uppercase; letter-spacing: 0.4px; color: #9C9284; margin-bottom: 1px;
-    }
-    .drawer { width: 100% !important; max-width: 100% !important; }
-    .modal {
-      width: 100% !important; max-width: 100% !important;
-      height: 100% !important; max-height: 100% !important; border-radius: 0 !important;
-      margin: 0 !important;
-    }
-    .info-grid { grid-template-columns: 1fr !important; }
-    .new-patient-grid { grid-template-columns: 1fr !important; padding: 16px !important; }
-    .modal-footer { padding: 12px 16px !important; }
-    .drawer-header, .drawer-body { padding-left: 16px !important; padding-right: 16px !important; }
-    .drawer-tabs { padding: 0 16px !important; overflow-x: auto !important; }
-    .agenda-row { flex-wrap: wrap !important; }
-    .agenda-name { width: 100% !important; }
-    .evo-row { flex-wrap: wrap !important; row-gap: 3px !important; }
-    .evo-row > div { width: auto !important; }
-    .kanban-col { width: 220px !important; }
-  }
-  @media (max-width: 480px) {
-    .cards-grid { grid-template-columns: 1fr !important; }
-  }
-</style>
-</head>
-<body>
-
-<div id="root"><div id="loading">Carregando o CRM…</div></div>
-
-<script type="text/babel" data-presets="react">
-
-const { useState, useEffect, useMemo, useRef } = React;
-const {
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, AreaChart, Area
-} = Recharts;
-
-/* ---------------------------------------------------------
-   Ícones (SVG simples, sem dependência externa)
---------------------------------------------------------- */
-function SvgIcon({ children, size = 16, color = "currentColor" }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      {children}
-    </svg>
-  );
-}
-const Search = (p) => <SvgIcon {...p}><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></SvgIcon>;
-const Plus = (p) => <SvgIcon {...p}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></SvgIcon>;
-const X = (p) => <SvgIcon {...p}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></SvgIcon>;
-const Menu = (p) => <SvgIcon {...p}><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></SvgIcon>;
-const Users = (p) => <SvgIcon {...p}><circle cx="9" cy="8" r="3.2" /><path d="M3.5 20c0-3.5 2.5-6 5.5-6s5.5 2.5 5.5 6" /><circle cx="17" cy="9" r="2.6" /><path d="M15 14.2c2.6.3 4.5 2.5 4.5 5.3" /></SvgIcon>;
-const CalendarIcon = (p) => <SvgIcon {...p}><rect x="3" y="5" width="18" height="16" rx="2" /><line x1="3" y1="10" x2="21" y2="10" /><line x1="8" y1="3" x2="8" y2="7" /><line x1="16" y1="3" x2="16" y2="7" /></SvgIcon>;
-const CheckSquare = (p) => <SvgIcon {...p}><rect x="3" y="3" width="18" height="18" rx="3" /><path d="M7 12l3.2 3.2L17 8.5" /></SvgIcon>;
-const CheckCircle2 = (p) => <SvgIcon {...p}><circle cx="12" cy="12" r="9" /><path d="M8 12.5l2.5 2.5L16 9" /></SvgIcon>;
-const Trash2 = (p) => <SvgIcon {...p}><path d="M4 7h16" /><path d="M9 7V4.5h6V7" /><path d="M6 7l1 13.5h10L18 7" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></SvgIcon>;
-const Pencil = (p) => <SvgIcon {...p}><path d="M15.5 4.5l4 4L8 20H4v-4z" /></SvgIcon>;
-const Settings = (p) => <SvgIcon {...p}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1.04 1.56V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1.04-1.56 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.34-1.87 1.7 1.7 0 00-1.56-1.04H3a2 2 0 110-4h.09a1.7 1.7 0 001.56-1.04 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.87.34H9a1.7 1.7 0 001.04-1.56V3a2 2 0 114 0v.09a1.7 1.7 0 001.04 1.56 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87V9a1.7 1.7 0 001.56 1.04H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.56 1.04z" /></SvgIcon>;
-const RefreshCw = (p) => <SvgIcon {...p}><path d="M21 12a9 9 0 01-15.3 6.4L3 16" /><path d="M3 12a9 9 0 0115.3-6.4L21 8" /><path d="M21 3v5h-5" /><path d="M3 21v-5h5" /></SvgIcon>;
-const Link2 = (p) => <SvgIcon {...p}><path d="M9 15l6-6" /><path d="M13 5.5l1-1a3.5 3.5 0 015 5l-1 1" /><path d="M11 18.5l-1 1a3.5 3.5 0 01-5-5l1-1" /></SvgIcon>;
-const Upload = (p) => <SvgIcon {...p}><path d="M12 16V4" /><path d="M6 10l6-6 6 6" /><path d="M4 20h16" /></SvgIcon>;
-const DollarSign = (p) => <SvgIcon {...p}><line x1="12" y1="2" x2="12" y2="22" /><path d="M17 6.5c0-1.7-2-3-5-3s-5 1.3-5 3 2 2.6 5 3.2 5 1.6 5 3.3-2 3-5 3-5-1.3-5-3" /></SvgIcon>;
-const LayoutDashboard = (p) => <SvgIcon {...p}><rect x="3" y="3" width="8" height="8" rx="1.5" /><rect x="13" y="3" width="8" height="5" rx="1.5" /><rect x="13" y="10" width="8" height="11" rx="1.5" /><rect x="3" y="13" width="8" height="8" rx="1.5" /></SvgIcon>;
-const Clock = (p) => <SvgIcon {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></SvgIcon>;
-const TagIcon = (p) => <SvgIcon {...p}><path d="M11 3H4v7l10 10 7-7L11 3z" /><circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none" /></SvgIcon>;
-const AlertTriangle = (p) => <SvgIcon {...p}><path d="M12 3l10 18H2L12 3z" /><line x1="12" y1="10" x2="12" y2="15" /><circle cx="12" cy="18" r="0.6" fill="currentColor" stroke="none" /></SvgIcon>;
-const TrendingUp = (p) => <SvgIcon {...p}><polyline points="3,17 9,11 13,15 21,6" /><polyline points="14,6 21,6 21,13" /></SvgIcon>;
-const ChevronRight = (p) => <SvgIcon {...p}><polyline points="9,6 15,12 9,18" /></SvgIcon>;
-const FileText = (p) => <SvgIcon {...p}><path d="M6 2h9l5 5v15H6z" /><line x1="9" y1="13" x2="17" y2="13" /><line x1="9" y1="17" x2="17" y2="17" /></SvgIcon>;
-const Activity = (p) => <SvgIcon {...p}><polyline points="2,12 7,12 10,20 14,4 17,12 22,12" /></SvgIcon>;
-const MessageCircle = (p) => <SvgIcon {...p}><path d="M21 12c0 4.4-4 8-9 8-1.4 0-2.7-.3-3.9-.8L3 20l1.1-4.3C3.4 14.5 3 13.3 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" /></SvgIcon>;
-const Cake = (p) => <SvgIcon {...p}><line x1="12" y1="2" x2="12" y2="6" /><rect x="3" y="10" width="18" height="10" rx="1.5" /><path d="M3 15c2-1 4 1 6 0s4-1 6 0 4 1 6 0" /></SvgIcon>;
-const Stethoscope = (p) => <SvgIcon {...p}><path d="M6 3v6a4 4 0 004 4h0a4 4 0 004-4V3" /><path d="M10 13v3a5 5 0 005 5h0a5 5 0 005-5v-1" /><circle cx="20" cy="15" r="1.6" /></SvgIcon>;
+} from "recharts";
+import {
+  Search, Plus, X, Users, Calendar, CheckSquare, DollarSign,
+  LayoutDashboard, Phone, Mail, MapPin, Tag as TagIcon, Clock,
+  AlertTriangle, TrendingUp, ChevronRight, FileText, Activity,
+  MessageCircle, Cake, Stethoscope, Baby, Menu, CheckCircle2, Trash2, Pencil,
+  Settings, RefreshCw, Link2, Upload
+} from "lucide-react";
 
 /* ---------------------------------------------------------
    Utilidades
@@ -199,6 +83,10 @@ function carregarXLSX() {
   });
 }
 
+/* ---------------------------------------------------------
+   Importação de planilha Excel (formato "Planilha de controle
+   de pacientes": abas "Pacientes" e "Ainda não fecharam")
+--------------------------------------------------------- */
 const formatPhoneBR = (raw) => {
   if (raw === null || raw === undefined || raw === "") return "";
   const s = String(raw).replace(/\D/g, "");
@@ -251,7 +139,13 @@ const agendaEventoParaGoogle = (evento, pacienteNome) => {
     description: [evento.obs, "Criado automaticamente pelo CRM da Bárbara Sales."].filter(Boolean).join("\n\n"),
     start: { dateTime: inicio, timeZone: "America/Sao_Paulo" },
     end: { dateTime: fim, timeZone: "America/Sao_Paulo" },
-    reminders: { useDefault: false, overrides: [{ method: "popup", minutes: 60 }, { method: "popup", minutes: 24 * 60 }] }
+    reminders: {
+      useDefault: false,
+      overrides: [
+        { method: "popup", minutes: 60 },
+        { method: "popup", minutes: 24 * 60 }
+      ]
+    }
   };
 };
 
@@ -261,8 +155,12 @@ const followupParaGoogle = (followup, pacienteNome) => {
   return {
     summary: `Follow-up: ${followup.titulo}`,
     description: [
-      `Paciente: ${pacienteNome}`, `Tipo: ${followup.tipo}`, `Prioridade: ${followup.prioridade}`,
-      `Responsável: ${followup.responsavel}`, "", "Criado automaticamente pelo CRM da Bárbara Sales."
+      `Paciente: ${pacienteNome}`,
+      `Tipo: ${followup.tipo}`,
+      `Prioridade: ${followup.prioridade}`,
+      `Responsável: ${followup.responsavel}`,
+      "",
+      "Criado automaticamente pelo CRM da Bárbara Sales."
     ].join("\n"),
     start: { dateTime: inicio, timeZone: "America/Sao_Paulo" },
     end: { dateTime: fim, timeZone: "America/Sao_Paulo" },
@@ -277,23 +175,32 @@ const mensagemErroGoogle = (status) => {
 
 async function criarEventoGoogle(token, payload) {
   const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
-    method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(payload)
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
   });
   if (!res.ok) throw new Error(mensagemErroGoogle(res.status));
   return res.json();
 }
+
 async function atualizarEventoGoogle(token, eventId, payload) {
   const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
-    method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(payload)
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
   });
   if (!res.ok) throw new Error(mensagemErroGoogle(res.status));
   return res.json();
 }
+
 async function excluirEventoGoogle(token, eventId) {
   const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
-    method: "DELETE", headers: { Authorization: `Bearer ${token}` }
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
   });
-  if (!res.ok && res.status !== 410 && res.status !== 404) throw new Error(mensagemErroGoogle(res.status));
+  if (!res.ok && res.status !== 410 && res.status !== 404) {
+    throw new Error(mensagemErroGoogle(res.status));
+  }
 }
 
 const maskTelefone = (v) => {
@@ -312,7 +219,13 @@ const gerarPagamentosHistorico = (acomp) => {
   for (let i = 0; i < (acomp.consultasRealizadas || 0); i++) {
     const d = new Date(inicio);
     d.setMonth(d.getMonth() + i);
-    pagamentos.push({ id: uid(), data: d.toISOString().slice(0, 10), valor: valorParcela, formaPagamento: acomp.formaPagamento, tipo: "parcela" });
+    pagamentos.push({
+      id: uid(),
+      data: d.toISOString().slice(0, 10),
+      valor: valorParcela,
+      formaPagamento: acomp.formaPagamento,
+      tipo: "parcela"
+    });
   }
   return pagamentos;
 };
@@ -6988,7 +6901,9 @@ const seedPatients = () => {
   return combinados.map((p) => ({
     ...p,
     sessoes: p.sessoes || [],
-    acompanhamento: p.acompanhamento ? { tipoId: "avulso", ...p.acompanhamento } : p.acompanhamento,
+    acompanhamento: p.acompanhamento
+      ? { tipoId: "avulso", ...p.acompanhamento }
+      : p.acompanhamento,
     pagamentos: gerarPagamentosHistorico(p.acompanhamento)
   }));
 };
@@ -6999,6 +6914,13 @@ const EVENT_TIPOS = ["Consulta", "Retorno", "Avaliação", "Outro"];
 const EVENT_STATUS_LABEL = { agendado: "Agendado", realizado: "Realizado", cancelado: "Cancelado" };
 const EVENT_STATUS_COLOR = { agendado: "#6E6355", realizado: "#918567", cancelado: "#A99790" };
 
+const seedFollowups = () => IMPORTED_FOLLOWUPS;
+
+/* ---------------------------------------------------------
+   Tipos de acompanhamento oferecidos pela Bárbara — cada um
+   com suas etapas reais de consulta, usados na aba "Consultas"
+   e no cálculo automático de duração/prazo do plano.
+--------------------------------------------------------- */
 const TIPOS_ACOMPANHAMENTO = [
   {
     id: "introducao_alimentar",
@@ -7049,8 +6971,6 @@ const TIPOS_ACOMPANHAMENTO = [
 ];
 const DURACAO_MINIMA_MESES = 1;
 
-const seedFollowups = () => IMPORTED_FOLLOWUPS;
-
 
 
 const KANBAN_COLS = [
@@ -7065,6 +6985,9 @@ const STATUS_LABEL = { ativo: "Ativo", pausa: "Em pausa", concluido: "Concluído
 const STATUS_COLOR = { ativo: "#918567", pausa: "#AFA998", concluido: "#9C9284", prospect: "#A99790" };
 const PRIORIDADE_COLOR = { alta: "#A99790", media: "#AFA998", baixa: "#CFC7B6" };
 
+/* ---------------------------------------------------------
+   Ícone-assinatura: mamadeira com coração
+--------------------------------------------------------- */
 const GrowthMark = ({ size = 28 }) => (
   <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
     <path d="M16 9 Q20 5 24 9" stroke="#867A6E" strokeWidth="2.3" strokeLinecap="round" fill="none" />
@@ -7080,7 +7003,7 @@ const GrowthMark = ({ size = 28 }) => (
 /* ---------------------------------------------------------
    App principal
 --------------------------------------------------------- */
-function App() {
+export default function App() {
   const [patients, setPatients] = useState([]);
   const [followups, setFollowups] = useState([]);
   const [view, setView] = useState("dashboard");
@@ -7097,37 +7020,48 @@ function App() {
   const tokenClientRef = useRef(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("crm-nutri-data");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        const p = parsed.patients || seedPatients();
-        setPatients(p);
-        setFollowups(parsed.followups || seedFollowups(p));
-        setEvents(parsed.events || seedEvents(p));
-        setGoogleClientId(parsed.googleClientId || "");
-      } else {
+    (async () => {
+      try {
+        const res = await window.storage.get("crm-nutri-data", false);
+        if (res && res.value) {
+          const parsed = JSON.parse(res.value);
+          const p = parsed.patients || seedPatients();
+          setPatients(p);
+          setFollowups(parsed.followups || seedFollowups(p));
+          setEvents(parsed.events || seedEvents(p));
+          setGoogleClientId(parsed.googleClientId || "");
+        } else {
+          const p = seedPatients();
+          setPatients(p);
+          setFollowups(seedFollowups(p));
+          setEvents(seedEvents(p));
+        }
+      } catch (e) {
         const p = seedPatients();
         setPatients(p);
         setFollowups(seedFollowups(p));
         setEvents(seedEvents(p));
       }
-    } catch (e) {
-      const p = seedPatients();
-      setPatients(p);
-      setFollowups(seedFollowups(p));
-      setEvents(seedEvents(p));
-    }
-    setLoaded(true);
+      setLoaded(true);
+    })();
   }, []);
 
   useEffect(() => {
     if (!loaded) return;
-    try {
-      localStorage.setItem("crm-nutri-data", JSON.stringify({ patients, followups, events, googleClientId }));
-    } catch (e) {}
+    (async () => {
+      try {
+        await window.storage.set(
+          "crm-nutri-data",
+          JSON.stringify({ patients, followups, events, googleClientId }),
+          false
+        );
+      } catch (e) {
+        console.error("Falha ao salvar:", e);
+      }
+    })();
   }, [patients, followups, events, googleClientId, loaded]);
 
+  // Carrega o script do Google Identity Services quando há um Client ID configurado
   useEffect(() => {
     if (!googleClientId) return;
     if (window.google?.accounts?.oauth2) { setGisReady(true); return; }
@@ -7182,30 +7116,46 @@ function App() {
     const q = query.toLowerCase();
     return patients.filter((p) =>
       [p.nome, p.diagnostico, p.responsavel, p.telefone, ...(p.tags || [])]
-        .join(" ").toLowerCase().includes(q)
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
     );
   }, [patients, query]);
 
   const updatePatient = (id, patch) => {
     setPatients((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   };
+
   const addPatient = (patient) => {
     setPatients((prev) => [{ ...patient, id: uid() }, ...prev]);
   };
-  const nomeDoPaciente = (pacienteId) => patients.find((p) => p.id === pacienteId)?.nome || "Paciente";
 
   const exportarPacientesExcel = async () => {
     try {
       const XLSXlib = await carregarXLSX();
       const linhas = patients.map((p) => ({
-        Nome: p.nome, "Data de nascimento": p.dataNascimento || "", Idade: calcIdade(p.dataNascimento),
-        Sexo: p.sexo === "F" ? "Feminino" : "Masculino", Status: STATUS_LABEL[p.status] || p.status,
-        Responsável: p.responsavel, Telefone: p.telefone, WhatsApp: p.whatsapp, "E-mail": p.email, Endereço: p.endereco,
-        Diagnóstico: p.diagnostico, Alergias: p.alergias, Medicamentos: p.medicamentos, Pediatra: p.pediatra,
-        Tags: (p.tags || []).join(", "), "Tipo de acompanhamento": p.acompanhamento?.tipo || "",
-        "Início do acompanhamento": p.acompanhamento?.dataInicio || "", "Fim previsto": p.acompanhamento?.dataFim || "",
-        "Consultas realizadas": p.acompanhamento?.consultasRealizadas ?? "", "Consultas total": p.acompanhamento?.consultasTotal ?? "",
-        "Valor do plano": p.acompanhamento?.valor || 0, "Último contato": p.ultimoContato || ""
+        Nome: p.nome,
+        "Data de nascimento": p.dataNascimento || "",
+        Idade: calcIdade(p.dataNascimento),
+        Sexo: p.sexo === "F" ? "Feminino" : "Masculino",
+        Status: STATUS_LABEL[p.status] || p.status,
+        Responsável: p.responsavel,
+        Telefone: p.telefone,
+        WhatsApp: p.whatsapp,
+        "E-mail": p.email,
+        Endereço: p.endereco,
+        Diagnóstico: p.diagnostico,
+        Alergias: p.alergias,
+        Medicamentos: p.medicamentos,
+        Pediatra: p.pediatra,
+        Tags: (p.tags || []).join(", "),
+        "Tipo de acompanhamento": p.acompanhamento?.tipo || "",
+        "Início do acompanhamento": p.acompanhamento?.dataInicio || "",
+        "Fim previsto": p.acompanhamento?.dataFim || "",
+        "Consultas realizadas": p.acompanhamento?.consultasRealizadas ?? "",
+        "Consultas total": p.acompanhamento?.consultasTotal ?? "",
+        "Valor do plano": p.acompanhamento?.valor || 0,
+        "Último contato": p.ultimoContato || ""
       }));
       const ws = XLSXlib.utils.json_to_sheet(linhas);
       const wb = XLSXlib.utils.book_new();
@@ -7385,8 +7335,12 @@ function App() {
     const eventosDoPaciente = events.filter((e) => e.pacienteId === id);
     const followupsDoPaciente = followups.filter((f) => f.pacienteId === id);
     if (googleToken) {
-      eventosDoPaciente.forEach((e) => { if (e.googleEventId) excluirEventoGoogle(googleToken, e.googleEventId).catch(() => {}); });
-      followupsDoPaciente.forEach((f) => { if (f.googleEventId) excluirEventoGoogle(googleToken, f.googleEventId).catch(() => {}); });
+      eventosDoPaciente.forEach((e) => {
+        if (e.googleEventId) excluirEventoGoogle(googleToken, e.googleEventId).catch(() => {});
+      });
+      followupsDoPaciente.forEach((f) => {
+        if (f.googleEventId) excluirEventoGoogle(googleToken, f.googleEventId).catch(() => {});
+      });
     }
     setEvents((prev) => prev.filter((e) => e.pacienteId !== id));
     setFollowups((prev) => prev.filter((f) => f.pacienteId !== id));
@@ -7394,6 +7348,8 @@ function App() {
     setSelectedId(null);
     logSync("Paciente excluído do CRM.");
   };
+
+  const nomeDoPaciente = (pacienteId) => patients.find((p) => p.id === pacienteId)?.nome || "Paciente";
 
   const moveFollowup = (id, coluna) => {
     setFollowups((prev) => prev.map((f) => (f.id === id ? { ...f, coluna } : f)));
@@ -7441,12 +7397,21 @@ function App() {
     let criados = 0;
     pendentes.forEach((p) => {
       addFollowup({
-        pacienteId: p.id, titulo: `Follow-up de prospecção — ${p.nome}`, tipo: "Fazer follow-up",
-        prioridade: "media", prazo, coluna: "afazer", responsavel: "Nutricionista"
+        pacienteId: p.id,
+        titulo: `Follow-up de prospecção — ${p.nome}`,
+        tipo: "Fazer follow-up",
+        prioridade: "media",
+        prazo,
+        coluna: "afazer",
+        responsavel: "Nutricionista"
       });
       criados++;
     });
-    logSync(criados > 0 ? `${criados} follow-up(s) de prospecção criado(s) para ${formatData(prazo)}.` : "Todas as prospecções já têm um follow-up pendente.");
+    logSync(
+      criados > 0
+        ? `${criados} follow-up(s) de prospecção criado(s) para ${formatData(prazo)}.`
+        : "Todas as prospecções já têm um follow-up pendente."
+    );
   };
 
   const deleteFollowup = (id) => {
@@ -7478,7 +7443,11 @@ function App() {
       const atualizado = prev.map((e) => (e.id === id ? { ...e, ...patch } : e));
       const eventoAtualizado = atualizado.find((e) => e.id === id);
       if (googleToken && eventoAtualizado?.googleEventId) {
-        atualizarEventoGoogle(googleToken, eventoAtualizado.googleEventId, agendaEventoParaGoogle(eventoAtualizado, nomeDoPaciente(eventoAtualizado.pacienteId)))
+        atualizarEventoGoogle(
+          googleToken,
+          eventoAtualizado.googleEventId,
+          agendaEventoParaGoogle(eventoAtualizado, nomeDoPaciente(eventoAtualizado.pacienteId))
+        )
           .then(() => logSync(`Evento atualizado no Google: ${eventoAtualizado.tipo} — ${nomeDoPaciente(eventoAtualizado.pacienteId)}`))
           .catch((err) => logSync(err.message, false));
       }
@@ -7507,7 +7476,9 @@ function App() {
         const resultado = await criarEventoGoogle(googleToken, agendaEventoParaGoogle(ev, nomeDoPaciente(ev.pacienteId)));
         setEvents((prev) => prev.map((e) => (e.id === ev.id ? { ...e, googleEventId: resultado.id } : e)));
         sucesso++;
-      } catch (err) { falhas++; }
+      } catch (err) {
+        falhas++;
+      }
     }
     for (const f of followups) {
       if (f.googleEventId || f.coluna === "concluido") continue;
@@ -7515,7 +7486,9 @@ function App() {
         const resultado = await criarEventoGoogle(googleToken, followupParaGoogle(f, nomeDoPaciente(f.pacienteId)));
         setFollowups((prev) => prev.map((x) => (x.id === f.id ? { ...x, googleEventId: resultado.id } : x)));
         sucesso++;
-      } catch (err) { falhas++; }
+      } catch (err) {
+        falhas++;
+      }
     }
     logSync(`Sincronização em massa concluída: ${sucesso} enviados, ${falhas} falharam.`, falhas === 0);
   };
@@ -7599,75 +7572,186 @@ function App() {
 
   const registrarConsultaHoje = (id) => {
     const hoje = new Date().toISOString().slice(0, 10);
-    setPatients((prev) => prev.map((p) => {
-      if (p.id !== id) return p;
-      const acomp = p.acompanhamento ? {
-        ...p.acompanhamento,
-        consultasRealizadas: Math.min((p.acompanhamento.consultasRealizadas || 0) + 1, p.acompanhamento.consultasTotal || (p.acompanhamento.consultasRealizadas || 0) + 1)
-      } : p.acompanhamento;
-      return {
-        ...p, ultimoContato: hoje, acompanhamento: acomp,
-        timeline: [...(p.timeline || []), { data: hoje, tipo: "consulta", texto: "Consulta registrada rapidamente." }]
-      };
-    }));
+    setPatients((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const acomp = p.acompanhamento
+          ? {
+              ...p.acompanhamento,
+              consultasRealizadas: Math.min(
+                (p.acompanhamento.consultasRealizadas || 0) + 1,
+                p.acompanhamento.consultasTotal || (p.acompanhamento.consultasRealizadas || 0) + 1
+              )
+            }
+          : p.acompanhamento;
+        return {
+          ...p,
+          ultimoContato: hoje,
+          acompanhamento: acomp,
+          timeline: [...(p.timeline || []), { data: hoje, tipo: "consulta", texto: "Consulta registrada rapidamente." }]
+        };
+      })
+    );
   };
 
   const addMedicao = (id, medicao) => {
-    setPatients((prev) => prev.map((p) => p.id === id ? {
-      ...p,
-      evolucao: [...(p.evolucao || []), medicao],
-      timeline: [...(p.timeline || []), { data: medicao.data, tipo: "nota", texto: `Nova medição: ${medicao.peso}kg / ${medicao.altura}cm.` }]
-    } : p));
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              evolucao: [...(p.evolucao || []), medicao],
+              timeline: [
+                ...(p.timeline || []),
+                { data: medicao.data, tipo: "nota", texto: `Nova medição: ${medicao.peso}kg / ${medicao.altura}cm.` }
+              ]
+            }
+          : p
+      )
+    );
   };
 
   const addPagamento = (id, pagamento) => {
-    setPatients((prev) => prev.map((p) => p.id === id ? {
-      ...p,
-      pagamentos: [...(p.pagamentos || []), pagamento],
-      timeline: [...(p.timeline || []), { data: pagamento.data, tipo: "nota", texto: `Pagamento registrado: ${formatMoeda(pagamento.valor)} (${pagamento.formaPagamento}).` }]
-    } : p));
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              pagamentos: [...(p.pagamentos || []), pagamento],
+              timeline: [
+                ...(p.timeline || []),
+                {
+                  data: pagamento.data,
+                  tipo: "nota",
+                  texto: `Pagamento registrado: ${formatMoeda(pagamento.valor)} (${pagamento.formaPagamento}).`
+                }
+              ]
+            }
+          : p
+      )
+    );
   };
 
   const addSessao = (id, sessao) => {
-    setPatients((prev) => prev.map((p) => {
-      if (p.id !== id) return p;
-      const acomp = p.acompanhamento ? {
-        ...p.acompanhamento,
-        consultasRealizadas: Math.min((p.acompanhamento.consultasRealizadas || 0) + 1, p.acompanhamento.consultasTotal || (p.acompanhamento.consultasRealizadas || 0) + 1)
-      } : p.acompanhamento;
-      return {
-        ...p, ultimoContato: sessao.data, acompanhamento: acomp,
-        sessoes: [...(p.sessoes || []), sessao],
-        timeline: [...(p.timeline || []), { data: sessao.data, tipo: "consulta", texto: `${sessao.titulo} — ${sessao.notas || "sem observações"}` }]
-      };
-    }));
+    setPatients((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const acomp = p.acompanhamento
+          ? {
+              ...p.acompanhamento,
+              consultasRealizadas: Math.min(
+                (p.acompanhamento.consultasRealizadas || 0) + 1,
+                p.acompanhamento.consultasTotal || (p.acompanhamento.consultasRealizadas || 0) + 1
+              )
+            }
+          : p.acompanhamento;
+        return {
+          ...p,
+          ultimoContato: sessao.data,
+          acompanhamento: acomp,
+          sessoes: [...(p.sessoes || []), sessao],
+          timeline: [
+            ...(p.timeline || []),
+            { data: sessao.data, tipo: "consulta", texto: `${sessao.titulo} — ${sessao.notas || "sem observações"}` }
+          ]
+        };
+      })
+    );
   };
 
   const setTipoAcompanhamento = (id, tipoId) => {
-    setPatients((prev) => prev.map((p) => {
-      if (p.id !== id) return p;
-      const tipoInfo = TIPOS_ACOMPANHAMENTO.find((t) => t.id === tipoId);
-      const dataInicio = p.acompanhamento?.dataInicio || new Date().toISOString().slice(0, 10);
-      const duracao = Math.max(tipoInfo?.duracaoMeses || 1, DURACAO_MINIMA_MESES);
-      const dataFim = addMesesData(dataInicio, duracao);
-      return {
-        ...p,
-        acompanhamento: {
-          ...p.acompanhamento, tipoId, tipo: tipoInfo?.label || "Consulta avulsa",
-          dataInicio, dataFim, consultasTotal: tipoInfo?.etapas?.length || p.acompanhamento?.consultasTotal || 1
-        }
-      };
-    }));
+    setPatients((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const tipoInfo = TIPOS_ACOMPANHAMENTO.find((t) => t.id === tipoId);
+        const dataInicio = p.acompanhamento?.dataInicio || new Date().toISOString().slice(0, 10);
+        const duracao = Math.max(tipoInfo?.duracaoMeses || 1, DURACAO_MINIMA_MESES);
+        const dataFim = addMesesData(dataInicio, duracao);
+        return {
+          ...p,
+          acompanhamento: {
+            ...p.acompanhamento,
+            tipoId,
+            tipo: tipoInfo?.label || "Consulta avulsa",
+            dataInicio,
+            dataFim,
+            consultasTotal: tipoInfo?.etapas?.length || p.acompanhamento?.consultasTotal || 1
+          }
+        };
+      })
+    );
   };
 
   if (!loaded) {
-    return <div style={{ ...styles.root, alignItems: "center", justifyContent: "center" }}>
-      <div style={{ color: "#6E6355", fontFamily: "Lato, sans-serif" }}>Carregando…</div>
-    </div>;
+    return (
+      <div style={{ ...styles.root, alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: "#6E6355", fontFamily: "Lato, sans-serif" }}>Carregando…</div>
+      </div>
+    );
   }
 
   return (
     <div style={styles.root}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Lato:wght@400;500;600;700&display=swap');
+        * { box-sizing: border-box; }
+        body { margin: 0; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-thumb { background: #D8CDBB; border-radius: 8px; }
+        button { font-family: inherit; cursor: pointer; }
+        input, select, textarea { font-family: inherit; }
+
+        .mobile-menu-btn { display: none; }
+
+        @media (max-width: 860px) {
+          .sidebar {
+            position: fixed !important; top: 0; left: 0; height: 100vh !important;
+            transform: translateX(-100%); transition: transform .25s ease;
+            z-index: 100 !important; width: 250px !important;
+            box-shadow: 8px 0 24px rgba(0,0,0,0.12);
+          }
+          .sidebar.mobile-open { transform: translateX(0); }
+          .sidebar-close-btn { display: flex !important; }
+          .mobile-menu-btn { display: flex !important; }
+          .header { padding: 14px 16px !important; }
+          .header-search { width: 100% !important; }
+          .header-date { display: none !important; }
+          .content { padding: 16px !important; }
+          .cards-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .charts-grid { grid-template-columns: 1fr !important; }
+          .table-header { display: none !important; }
+          .table-row {
+            flex-direction: column !important; align-items: flex-start !important;
+            gap: 5px !important; padding: 14px 0 !important;
+          }
+          .table-row > div { width: 100% !important; }
+          .chevron-col { display: none !important; }
+          .table-row [data-label]::before {
+            content: attr(data-label); display: block; font-size: 10.5px;
+            text-transform: uppercase; letter-spacing: 0.4px; color: #9C9284; margin-bottom: 1px;
+          }
+          .drawer { width: 100% !important; max-width: 100% !important; }
+          .modal {
+            width: 100% !important; max-width: 100% !important;
+            height: 100% !important; max-height: 100% !important; border-radius: 0 !important;
+            margin: 0 !important;
+          }
+          .info-grid { grid-template-columns: 1fr !important; }
+          .new-patient-grid { grid-template-columns: 1fr !important; padding: 16px !important; }
+          .modal-footer { padding: 12px 16px !important; }
+          .drawer-header, .drawer-body { padding-left: 16px !important; padding-right: 16px !important; }
+          .drawer-tabs { padding: 0 16px !important; overflow-x: auto !important; }
+          .agenda-row { flex-wrap: wrap !important; }
+          .agenda-name { width: 100% !important; }
+          .evo-row { flex-wrap: wrap !important; row-gap: 3px !important; }
+          .evo-row > div { width: auto !important; }
+          .kanban-col { width: 220px !important; }
+        }
+        @media (max-width: 480px) {
+          .cards-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+
       <Sidebar
         view={view}
         setView={(v) => { setView(v); setMobileNavOpen(false); }}
@@ -7676,15 +7760,42 @@ function App() {
         onClose={() => setMobileNavOpen(false)}
       />
       {mobileNavOpen && (
-        <div onClick={() => setMobileNavOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(134,122,110,0.35)", zIndex: 90 }} />
+        <div
+          onClick={() => setMobileNavOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(134,122,110,0.35)", zIndex: 90 }}
+        />
       )}
+
       <div style={styles.main}>
         <Header query={query} setQuery={setQuery} onMenuClick={() => setMobileNavOpen(true)} />
+
         <div style={styles.content} className="content">
-          {view === "dashboard" && <Dashboard patients={patients} followups={followups} setView={setView} setSelectedId={setSelectedId} />}
-          {view === "patients" && <PatientsList patients={filteredPatients} onOpen={(id) => setSelectedId(id)} onNew={() => setShowNewPatient(true)} onQuickConsulta={registrarConsultaHoje} onExportar={exportarPacientesExcel} onImportar={importarPacientesExcel} />}
-          {view === "agenda" && <Agenda patients={patients} events={events} onAdd={addEvent} onUpdate={updateEvent} onDelete={deleteEvent} />}
-          {view === "followups" && <FollowupsBoard followups={followups} patients={patients} onMove={moveFollowup} onAdd={addFollowup} onDelete={deleteFollowup} onCriarProspeccao={criarFollowupsProspeccao} />}
+          {view === "dashboard" && (
+            <Dashboard patients={patients} followups={followups} setView={setView} setSelectedId={setSelectedId} />
+          )}
+          {view === "patients" && (
+            <PatientsList
+              patients={filteredPatients}
+              onOpen={(id) => setSelectedId(id)}
+              onNew={() => setShowNewPatient(true)}
+              onQuickConsulta={registrarConsultaHoje}
+              onExportar={exportarPacientesExcel}
+              onImportar={importarPacientesExcel}
+            />
+          )}
+          {view === "agenda" && (
+            <Agenda patients={patients} events={events} onAdd={addEvent} onUpdate={updateEvent} onDelete={deleteEvent} />
+          )}
+          {view === "followups" && (
+            <FollowupsBoard
+              followups={followups}
+              patients={patients}
+              onMove={moveFollowup}
+              onAdd={addFollowup}
+              onDelete={deleteFollowup}
+              onCriarProspeccao={criarFollowupsProspeccao}
+            />
+          )}
           {view === "financeiro" && <Financeiro patients={patients} onAddPagamento={addPagamento} />}
           {view === "integracoes" && (
             <Integracoes
@@ -7708,6 +7819,7 @@ function App() {
           )}
         </div>
       </div>
+
       {selectedPatient && (
         <PatientDetail
           patient={selectedPatient}
@@ -7721,18 +7833,28 @@ function App() {
           onDeletePatient={() => deletePatient(selectedPatient.id)}
         />
       )}
+
       {showNewPatient && (
-        <NewPatientModal onClose={() => setShowNewPatient(false)} onSave={(p) => { addPatient(p); setShowNewPatient(false); }} />
+        <NewPatientModal
+          onClose={() => setShowNewPatient(false)}
+          onSave={(p) => {
+            addPatient(p);
+            setShowNewPatient(false);
+          }}
+        />
       )}
     </div>
   );
 }
 
+/* ---------------------------------------------------------
+   Sidebar
+--------------------------------------------------------- */
 function Sidebar({ view, setView, onNewPatient, mobileOpen, onClose }) {
   const items = [
     { id: "dashboard", label: "Painel", icon: LayoutDashboard },
     { id: "patients", label: "Pacientes", icon: Users },
-    { id: "agenda", label: "Agenda", icon: CalendarIcon },
+    { id: "agenda", label: "Agenda", icon: Calendar },
     { id: "followups", label: "Follow-up", icon: CheckSquare },
     { id: "financeiro", label: "Financeiro", icon: DollarSign },
     { id: "integracoes", label: "Integrações", icon: Settings }
@@ -7743,47 +7865,78 @@ function Sidebar({ view, setView, onNewPatient, mobileOpen, onClose }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <GrowthMark />
           <div>
-            <div style={{ fontFamily: "Playfair Display, serif", fontSize: 17, fontWeight: 600, color: "#867A6E" }}>Bárbara Sales</div>
+            <div style={{ fontFamily: "Playfair Display, serif", fontSize: 17, fontWeight: 600, color: "#867A6E" }}>
+              Bárbara Sales
+            </div>
             <div style={{ fontSize: 11, color: "#9C9284", letterSpacing: 0.4 }}>Nutrição Materno-Infantil</div>
           </div>
         </div>
-        <button className="sidebar-close-btn" onClick={onClose}
-          style={{ display: "none", background: "none", border: "none", color: "#6E6355", padding: 4 }}>
+        <button
+          className="sidebar-close-btn"
+          onClick={onClose}
+          style={{ display: "none", background: "none", border: "none", color: "#6E6355", padding: 4 }}
+        >
           <X size={18} />
         </button>
       </div>
-      <button style={styles.newBtn} onClick={onNewPatient}><Plus size={16} /> Novo paciente</button>
+
+      <button style={styles.newBtn} onClick={onNewPatient}>
+        <Plus size={16} /> Novo paciente
+      </button>
+
       <nav style={{ marginTop: 18 }}>
         {items.map((it) => {
           const Icon = it.icon;
           const active = view === it.id;
           return (
-            <div key={it.id} onClick={() => setView(it.id)} style={{
-              ...styles.navItem, background: active ? "#867A6E" : "transparent", color: active ? "#F6F0E7" : "#6E6355"
-            }}>
-              <Icon size={17} /><span>{it.label}</span>
+            <div
+              key={it.id}
+              onClick={() => setView(it.id)}
+              style={{
+                ...styles.navItem,
+                background: active ? "#867A6E" : "transparent",
+                color: active ? "#F6F0E7" : "#6E6355"
+              }}
+            >
+              <Icon size={17} />
+              <span>{it.label}</span>
             </div>
           );
         })}
       </nav>
-      <div style={styles.sidebarFooter}>CRN 7168 · Guiando com amor a alimentação, da amamentação ao fim da infância.</div>
+
+      <div style={styles.sidebarFooter}>
+        CRN 7168 · Guiando com amor a alimentação, da amamentação ao fim da infância.
+      </div>
     </div>
   );
 }
 
+/* ---------------------------------------------------------
+   Header
+--------------------------------------------------------- */
 function Header({ query, setQuery, onMenuClick }) {
-  const hoje = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
+  const hoje = new Date().toLocaleDateString("pt-BR", {
+    weekday: "long", day: "2-digit", month: "long"
+  });
   return (
     <div style={styles.header} className="header">
       <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-        <button className="mobile-menu-btn" onClick={onMenuClick}
-          style={{ background: "none", border: "none", color: "#867A6E", padding: 4, flexShrink: 0 }}>
+        <button
+          className="mobile-menu-btn"
+          onClick={onMenuClick}
+          style={{ background: "none", border: "none", color: "#867A6E", padding: 4, flexShrink: 0 }}
+        >
           <Menu size={20} />
         </button>
         <div className="header-search" style={{ position: "relative", width: 380, maxWidth: "100%" }}>
           <Search size={16} style={{ position: "absolute", left: 12, top: 11, color: "#9C9284" }} />
-          <input value={query} onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por nome, diagnóstico, tag, telefone…" style={styles.searchInput} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por nome, diagnóstico, tag, telefone…"
+            style={styles.searchInput}
+          />
         </div>
       </div>
       <div className="header-date" style={{ fontSize: 13, color: "#9C9284", textTransform: "capitalize", flexShrink: 0, marginLeft: 12 }}>{hoje}</div>
@@ -7791,11 +7944,15 @@ function Header({ query, setQuery, onMenuClick }) {
   );
 }
 
+/* ---------------------------------------------------------
+   Dashboard
+--------------------------------------------------------- */
 function Dashboard({ patients, followups, setView, setSelectedId }) {
   const ativos = patients.filter((p) => p.status === "ativo").length;
   const pausa = patients.filter((p) => p.status === "pausa").length;
   const concluidos = patients.filter((p) => p.status === "concluido").length;
   const prospeccao = patients.filter((p) => p.status === "prospect").length;
+
   const receitaPrevista = patients.reduce((s, p) => s + (p.acompanhamento?.valor || 0), 0);
   const receitaRecebida = patients.reduce((s, p) => {
     const a = p.acompanhamento;
@@ -7803,11 +7960,14 @@ function Dashboard({ patients, followups, setView, setSelectedId }) {
     return s + (a.valor / a.consultasTotal) * a.consultasRealizadas;
   }, 0);
   const receitaPendente = receitaPrevista - receitaRecebida;
+
   const semContato = patients.filter((p) => {
     const d = diasDesde(p.ultimoContato);
     return d !== null && d >= 21 && p.status === "ativo";
   });
+
   const followupsPendentes = followups.filter((f) => f.coluna !== "concluido").length;
+
   const aniversariantes = patients.filter((p) => {
     if (!p.dataNascimento) return false;
     const n = new Date(p.dataNascimento);
@@ -7817,11 +7977,13 @@ function Dashboard({ patients, followups, setView, setSelectedId }) {
     return diff >= 0 && diff <= 7;
   });
 
+  // Últimos 5 meses, calculados a partir de dados reais (não fictícios)
   const hoje0 = new Date();
   const meses5 = Array.from({ length: 5 }, (_, i) => {
     const d = new Date(hoje0.getFullYear(), hoje0.getMonth() - (4 - i), 1);
     return { y: d.getFullYear(), m: d.getMonth(), label: d.toLocaleDateString("pt-BR", { month: "short" }) };
   });
+
   const evolucaoPacientes = meses5.map(({ y, m, label }) => ({
     mes: label.charAt(0).toUpperCase() + label.slice(1),
     pacientes: patients.filter((p) => {
@@ -7830,6 +7992,7 @@ function Dashboard({ patients, followups, setView, setSelectedId }) {
       return d.getFullYear() === y && d.getMonth() === m;
     }).length
   }));
+
   const receitaMensal = meses5.map(({ y, m, label }) => ({
     mes: label.charAt(0).toUpperCase() + label.slice(1),
     valor: patients.reduce((s, p) => {
@@ -7844,17 +8007,20 @@ function Dashboard({ patients, followups, setView, setSelectedId }) {
   return (
     <div>
       <SectionTitle title="Painel" subtitle="Visão geral da clínica em tempo real" />
+
       <div style={styles.cardsGrid} className="cards-grid">
         <MetricCard label="Pacientes ativos" value={ativos} icon={Users} accent="#918567" />
         <MetricCard label="Em pausa" value={pausa} icon={Clock} accent="#AFA998" />
         <MetricCard label="Concluídos" value={concluidos} icon={CheckSquare} accent="#9C9284" />
         <MetricCard label="Em prospecção" value={prospeccao} icon={MessageCircle} accent="#A99790" />
-        <MetricCard label="Follow-ups pendentes" value={followupsPendentes} icon={MessageCircle} accent="#A99790" onClick={() => setView("followups")} />
+        <MetricCard label="Follow-ups pendentes" value={followupsPendentes} icon={MessageCircle} accent="#A99790"
+          onClick={() => setView("followups")} />
         <MetricCard label="Receita prevista" value={formatMoeda(receitaPrevista)} icon={DollarSign} accent="#867A6E" />
         <MetricCard label="Receita recebida" value={formatMoeda(receitaRecebida)} icon={TrendingUp} accent="#918567" />
         <MetricCard label="Receita pendente" value={formatMoeda(receitaPendente)} icon={AlertTriangle} accent="#AFA998" />
         <MetricCard label="Aniversariantes da semana" value={aniversariantes.length} icon={Cake} accent="#A99790" />
       </div>
+
       <div style={styles.chartsGrid} className="charts-grid">
         <div style={styles.panel}>
           <div style={styles.panelTitle}>Evolução do número de pacientes</div>
@@ -7874,19 +8040,22 @@ function Dashboard({ patients, followups, setView, setSelectedId }) {
             </AreaChart>
           </ResponsiveContainer>
         </div>
+
         <div style={styles.panel}>
           <div style={styles.panelTitle}>Receita mensal</div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={receitaMensal}>
               <CartesianGrid stroke="#E3DACB" vertical={false} />
               <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#9C9284" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: "#9C9284" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v / 1000}k`} />
+              <YAxis tick={{ fontSize: 12, fill: "#9C9284" }} axisLine={false} tickLine={false}
+                tickFormatter={(v) => `${v / 1000}k`} />
               <Tooltip formatter={(v) => formatMoeda(v)} contentStyle={{ borderRadius: 8, border: "1px solid #E3DACB", fontSize: 13 }} />
               <Bar dataKey="valor" fill="#867A6E" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
+
       <div style={styles.panel}>
         <div style={styles.panelTitle}>Pacientes sem contato há 21+ dias</div>
         {semContato.length === 0 ? (
@@ -7898,7 +8067,9 @@ function Dashboard({ patients, followups, setView, setSelectedId }) {
                 <div style={{ fontWeight: 600, color: "#867A6E" }}>{p.nome}</div>
                 <div style={{ fontSize: 12, color: "#9C9284" }}>{p.diagnostico}</div>
               </div>
-              <div style={{ fontSize: 12, color: "#A99790", fontWeight: 600 }}>{diasDesde(p.ultimoContato)} dias sem contato</div>
+              <div style={{ fontSize: 12, color: "#A99790", fontWeight: 600 }}>
+                {diasDesde(p.ultimoContato)} dias sem contato
+              </div>
             </div>
           ))
         )}
@@ -7910,7 +8081,9 @@ function Dashboard({ patients, followups, setView, setSelectedId }) {
 function MetricCard({ label, value, icon: Icon, accent, onClick }) {
   return (
     <div style={{ ...styles.metricCard, cursor: onClick ? "pointer" : "default" }} onClick={onClick}>
-      <div style={{ ...styles.metricIcon, background: accent + "1A", color: accent }}><Icon size={17} /></div>
+      <div style={{ ...styles.metricIcon, background: accent + "1A", color: accent }}>
+        <Icon size={17} />
+      </div>
       <div>
         <div style={styles.metricValue}>{value}</div>
         <div style={styles.metricLabel}>{label}</div>
@@ -7931,6 +8104,9 @@ function SectionTitle({ title, subtitle, action }) {
   );
 }
 
+/* ---------------------------------------------------------
+   Lista de pacientes
+--------------------------------------------------------- */
 function PatientsList({ patients, onOpen, onNew, onQuickConsulta, onExportar, onImportar }) {
   const fileInputRef = useRef(null);
   const [filtroStatus, setFiltroStatus] = useState("todos");
@@ -8057,12 +8233,18 @@ function PatientsList({ patients, onOpen, onNew, onQuickConsulta, onExportar, on
 
 function StatusPill({ status }) {
   return (
-    <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20, background: STATUS_COLOR[status] + "1F", color: STATUS_COLOR[status] }}>
+    <span style={{
+      fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20,
+      background: STATUS_COLOR[status] + "1F", color: STATUS_COLOR[status]
+    }}>
       {STATUS_LABEL[status]}
     </span>
   );
 }
 
+/* ---------------------------------------------------------
+   Detalhe do paciente
+--------------------------------------------------------- */
 function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedicao, onAddPagamento, onAddSessao, onSetTipoAcompanhamento, onDeletePatient }) {
   const [tab, setTab] = useState("dados");
   const [showMedicaoForm, setShowMedicaoForm] = useState(false);
@@ -8072,28 +8254,48 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
   const [editForm, setEditForm] = useState(null);
   const [idadeAnosEdit, setIdadeAnosEdit] = useState("");
   const [idadeMesesEdit, setIdadeMesesEdit] = useState("");
-  const [medicao, setMedicao] = useState({ peso: "", altura: "", data: new Date().toISOString().slice(0, 10), obs: "" });
-  const [sessaoForm, setSessaoForm] = useState({ titulo: "", data: new Date().toISOString().slice(0, 10), notas: "" });
+  const [medicao, setMedicao] = useState({
+    peso: "", altura: "", data: new Date().toISOString().slice(0, 10), obs: ""
+  });
+  const [sessaoForm, setSessaoForm] = useState({
+    titulo: "", data: new Date().toISOString().slice(0, 10), notas: ""
+  });
   const tabs = [
     { id: "dados", label: "Dados", icon: FileText },
     { id: "timeline", label: "Timeline", icon: Clock },
     { id: "consultas", label: "Consultas", icon: Activity },
     { id: "acompanhamento", label: "Acompanhamento", icon: Stethoscope }
   ];
-  const evolucaoChart = (patient.evolucao || []).map((e) => ({
-    data: formatData(e.data).slice(0, 5), peso: e.peso, imc: Number(calcIMC(e.peso, e.altura))
-  }));
 
-  const tipoInfo = TIPOS_ACOMPANHAMENTO.find((t) => t.id === patient.acompanhamento?.tipoId) || TIPOS_ACOMPANHAMENTO.find((t) => t.id === "avulso");
+  const tipoInfo =
+    TIPOS_ACOMPANHAMENTO.find((t) => t.id === patient.acompanhamento?.tipoId) ||
+    TIPOS_ACOMPANHAMENTO.find((t) => t.id === "avulso");
+
   const etapasComStatus = (tipoInfo.etapas || []).map((etapa) => {
     const sessao = (patient.sessoes || []).find((s) => s.titulo === etapa.titulo);
-    return { ...etapa, dataPrevista: addMesesData(patient.acompanhamento?.dataInicio, etapa.offsetMeses), feita: !!sessao, sessao };
+    return {
+      ...etapa,
+      dataPrevista: addMesesData(patient.acompanhamento?.dataInicio, etapa.offsetMeses),
+      feita: !!sessao,
+      sessao
+    };
   });
   const etapasPendentes = etapasComStatus.filter((e) => !e.feita).map((e) => e.titulo);
 
+  const evolucaoChart = (patient.evolucao || []).map((e) => ({
+    data: formatData(e.data).slice(0, 5),
+    peso: e.peso,
+    imc: Number(calcIMC(e.peso, e.altura))
+  }));
+
   const salvarMedicao = () => {
     if (!medicao.peso || !medicao.altura) return;
-    onAddMedicao({ data: medicao.data, peso: Number(medicao.peso), altura: Number(medicao.altura), obs: medicao.obs });
+    onAddMedicao({
+      data: medicao.data,
+      peso: Number(medicao.peso),
+      altura: Number(medicao.altura),
+      obs: medicao.obs
+    });
     setMedicao({ peso: "", altura: "", data: new Date().toISOString().slice(0, 10), obs: "" });
     setShowMedicaoForm(false);
   };
@@ -8107,11 +8309,21 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
 
   const iniciarEdicao = () => {
     setEditForm({
-      nome: patient.nome || "", dataNascimento: patient.dataNascimento || "", sexo: patient.sexo || "F",
-      status: patient.status || "ativo", escola: patient.escola || "", diagnostico: patient.diagnostico || "",
-      alergias: patient.alergias || "", medicamentos: patient.medicamentos || "", pediatra: patient.pediatra || "",
-      responsavel: patient.responsavel || "", telefone: patient.telefone || "", whatsapp: patient.whatsapp || "",
-      email: patient.email || "", endereco: patient.endereco || "", tags: (patient.tags || []).join(", ")
+      nome: patient.nome || "",
+      dataNascimento: patient.dataNascimento || "",
+      sexo: patient.sexo || "F",
+      status: patient.status || "ativo",
+      escola: patient.escola || "",
+      diagnostico: patient.diagnostico || "",
+      alergias: patient.alergias || "",
+      medicamentos: patient.medicamentos || "",
+      pediatra: patient.pediatra || "",
+      responsavel: patient.responsavel || "",
+      telefone: patient.telefone || "",
+      whatsapp: patient.whatsapp || "",
+      email: patient.email || "",
+      endereco: patient.endereco || "",
+      tags: (patient.tags || []).join(", ")
     });
     setIdadeAnosEdit("");
     setIdadeMesesEdit("");
@@ -8120,7 +8332,10 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
 
   const salvarEdicao = () => {
     if (!editForm.nome.trim()) return;
-    onUpdate({ ...editForm, tags: editForm.tags.split(",").map((t) => t.trim()).filter(Boolean) });
+    onUpdate({
+      ...editForm,
+      tags: editForm.tags.split(",").map((t) => t.trim()).filter(Boolean)
+    });
     setEditMode(false);
   };
 
@@ -8130,8 +8345,12 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
       <div style={styles.drawer} className="drawer" onClick={(e) => e.stopPropagation()}>
         <div style={styles.drawerHeader} className="drawer-header">
           <div>
-            <div style={{ fontFamily: "Playfair Display, serif", fontSize: 22, fontWeight: 600, color: "#867A6E" }}>{patient.nome}</div>
-            <div style={{ fontSize: 13, color: "#9C9284", marginTop: 2 }}>{calcIdade(patient.dataNascimento)} · {patient.diagnostico}</div>
+            <div style={{ fontFamily: "Playfair Display, serif", fontSize: 22, fontWeight: 600, color: "#867A6E" }}>
+              {patient.nome}
+            </div>
+            <div style={{ fontSize: 13, color: "#9C9284", marginTop: 2 }}>
+              {calcIdade(patient.dataNascimento)} · {patient.diagnostico}
+            </div>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             {tab === "dados" && !editMode && (
@@ -8140,18 +8359,24 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
             <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
           </div>
         </div>
+
         <div className="drawer-tabs" style={{ display: "flex", gap: 6, padding: "0 24px", borderBottom: "1px solid #E3DACB" }}>
           {tabs.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
             return (
               <div key={t.id} onClick={() => setTab(t.id)} style={{
-                display: "flex", alignItems: "center", gap: 6, padding: "10px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                color: active ? "#867A6E" : "#9C9284", borderBottom: active ? "2px solid #867A6E" : "2px solid transparent"
-              }}><Icon size={14} /> {t.label}</div>
+                display: "flex", alignItems: "center", gap: 6, padding: "10px 12px",
+                fontSize: 13, fontWeight: 600, cursor: "pointer",
+                color: active ? "#867A6E" : "#9C9284",
+                borderBottom: active ? "2px solid #867A6E" : "2px solid transparent"
+              }}>
+                <Icon size={14} /> {t.label}
+              </div>
             );
           })}
         </div>
+
         <div className="drawer-body" style={{ padding: 24, overflowY: "auto", flex: 1 }}>
           {tab === "dados" && !editMode && (
             <div>
@@ -8166,6 +8391,7 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                   <DollarSign size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Registrar pagamento
                 </button>
               </div>
+
               {showMedicaoForm && (
                 <div style={{ ...styles.panel, marginBottom: 18 }}>
                   <div className="new-patient-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
@@ -8180,46 +8406,71 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                   </div>
                 </div>
               )}
+
               <InfoGrid items={[
                 ["Data de nascimento", formatData(patient.dataNascimento)],
                 ["Sexo", patient.sexo === "F" ? "Feminino" : "Masculino"],
-                ["Escola", patient.escola], ["Alergias", patient.alergias],
-                ["Medicamentos", patient.medicamentos], ["Pediatra", patient.pediatra]
+                ["Escola", patient.escola],
+                ["Alergias", patient.alergias],
+                ["Medicamentos", patient.medicamentos],
+                ["Pediatra", patient.pediatra]
               ]} />
               <div style={styles.divider} />
               <div style={styles.miniTitle}>Contato e responsável</div>
               <InfoGrid items={[
-                ["Responsável", patient.responsavel], ["Telefone", patient.telefone],
-                ["WhatsApp", patient.whatsapp], ["E-mail", patient.email], ["Endereço", patient.endereco]
+                ["Responsável", patient.responsavel],
+                ["Telefone", patient.telefone],
+                ["WhatsApp", patient.whatsapp],
+                ["E-mail", patient.email],
+                ["Endereço", patient.endereco]
               ]} />
               <div style={styles.divider} />
               <div style={styles.miniTitle}>Tags</div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {(patient.tags || []).map((t) => <span key={t} style={styles.tagPill}><TagIcon size={11} /> {t}</span>)}
+                {(patient.tags || []).map((t) => (
+                  <span key={t} style={styles.tagPill}><TagIcon size={11} /> {t}</span>
+                ))}
               </div>
             </div>
           )}
+
           {tab === "dados" && editMode && editForm && (
             <div>
               <div className="new-patient-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <Field label="Nome da criança" value={editForm.nome} onChange={(v) => setEditForm((f) => ({ ...f, nome: v }))} full />
                 <Field label="Data de nascimento" type="date" value={editForm.dataNascimento} onChange={(v) => { setEditForm((f) => ({ ...f, dataNascimento: v })); setIdadeAnosEdit(""); setIdadeMesesEdit(""); }} />
                 <div>
-                  <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>Ou informe a idade aproximada</div>
+                  <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                    Ou informe a idade aproximada
+                  </div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <input type="number" min="0" placeholder="anos" value={idadeAnosEdit}
-                      onChange={(e) => { setIdadeAnosEdit(e.target.value); setEditForm((f) => ({ ...f, dataNascimento: dataNascimentoDeIdade(e.target.value || 0, idadeMesesEdit || 0) })); }}
-                      style={{ ...styles.input, width: "50%" }} />
-                    <input type="number" min="0" max="11" placeholder="meses" value={idadeMesesEdit}
-                      onChange={(e) => { setIdadeMesesEdit(e.target.value); setEditForm((f) => ({ ...f, dataNascimento: dataNascimentoDeIdade(idadeAnosEdit || 0, e.target.value || 0) })); }}
-                      style={{ ...styles.input, width: "50%" }} />
+                    <input
+                      type="number" min="0" placeholder="anos"
+                      value={idadeAnosEdit}
+                      onChange={(e) => {
+                        setIdadeAnosEdit(e.target.value);
+                        setEditForm((f) => ({ ...f, dataNascimento: dataNascimentoDeIdade(e.target.value || 0, idadeMesesEdit || 0) }));
+                      }}
+                      style={{ ...styles.input, width: "50%" }}
+                    />
+                    <input
+                      type="number" min="0" max="11" placeholder="meses"
+                      value={idadeMesesEdit}
+                      onChange={(e) => {
+                        setIdadeMesesEdit(e.target.value);
+                        setEditForm((f) => ({ ...f, dataNascimento: dataNascimentoDeIdade(idadeAnosEdit || 0, e.target.value || 0) }));
+                      }}
+                      style={{ ...styles.input, width: "50%" }}
+                    />
                   </div>
                 </div>
                 <Field label="Sexo" type="select" options={["F", "M"]} value={editForm.sexo} onChange={(v) => setEditForm((f) => ({ ...f, sexo: v }))} />
-                <Field label="Status" type="select"
+                <Field
+                  label="Status" type="select"
                   options={Object.values(STATUS_LABEL)}
                   value={STATUS_LABEL[editForm.status]}
-                  onChange={(label) => setEditForm((f) => ({ ...f, status: Object.keys(STATUS_LABEL).find((k) => STATUS_LABEL[k] === label) }))} />
+                  onChange={(label) => setEditForm((f) => ({ ...f, status: Object.keys(STATUS_LABEL).find((k) => STATUS_LABEL[k] === label) }))}
+                />
                 <Field label="Diagnóstico" value={editForm.diagnostico} onChange={(v) => setEditForm((f) => ({ ...f, diagnostico: v }))} full />
                 <Field label="Alergias" value={editForm.alergias} onChange={(v) => setEditForm((f) => ({ ...f, alergias: v }))} />
                 <Field label="Medicamentos" value={editForm.medicamentos} onChange={(v) => setEditForm((f) => ({ ...f, medicamentos: v }))} />
@@ -8234,8 +8485,13 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
                 <button
-                  onClick={() => { if (window.confirm(`Excluir ${patient.nome} definitivamente? Isso também remove os agendamentos e follow-ups vinculados a este paciente. Essa ação não pode ser desfeita.`)) onDeletePatient(); }}
-                  style={{ background: "none", border: "none", color: "#A99790", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, padding: 0 }}>
+                  onClick={() => {
+                    if (window.confirm(`Excluir ${patient.nome} definitivamente? Isso também remove os agendamentos e follow-ups vinculados a este paciente. Essa ação não pode ser desfeita.`)) {
+                      onDeletePatient();
+                    }
+                  }}
+                  style={{ background: "none", border: "none", color: "#A99790", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, padding: 0 }}
+                >
                   <Trash2 size={14} /> Excluir paciente
                 </button>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -8245,6 +8501,7 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
               </div>
             </div>
           )}
+
           {tab === "timeline" && (
             <div>
               {(patient.timeline || []).slice().reverse().map((ev, i) => (
@@ -8256,9 +8513,12 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                   </div>
                 </div>
               ))}
-              {(!patient.timeline || patient.timeline.length === 0) && <div style={styles.emptyRow}>Nenhum evento registrado ainda.</div>}
+              {(!patient.timeline || patient.timeline.length === 0) && (
+                <div style={styles.emptyRow}>Nenhum evento registrado ainda.</div>
+              )}
             </div>
           )}
+
           {tab === "consultas" && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 14 }}>
@@ -8270,7 +8530,13 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                     </div>
                   )}
                 </div>
-                <button style={styles.secondaryBtn} onClick={() => { setSessaoForm((f) => ({ ...f, titulo: etapasPendentes[0] || "" })); setShowSessaoForm((v) => !v); }}>
+                <button
+                  style={styles.secondaryBtn}
+                  onClick={() => {
+                    setSessaoForm((f) => ({ ...f, titulo: etapasPendentes[0] || "" }));
+                    setShowSessaoForm((v) => !v);
+                  }}
+                >
                   <CheckCircle2 size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Registrar consulta
                 </button>
               </div>
@@ -8278,17 +8544,28 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
               {showSessaoForm && (
                 <div style={{ ...styles.panel, marginBottom: 16 }}>
                   {tipoInfo.etapas.length > 0 ? (
-                    <Field label="Etapa realizada" type="select" full
+                    <Field
+                      label="Etapa realizada" type="select" full
                       options={etapasPendentes.length ? etapasPendentes : etapasComStatus.map((e) => e.titulo)}
-                      value={sessaoForm.titulo} onChange={(v) => setSessaoForm((f) => ({ ...f, titulo: v }))} />
+                      value={sessaoForm.titulo}
+                      onChange={(v) => setSessaoForm((f) => ({ ...f, titulo: v }))}
+                    />
                   ) : (
-                    <Field label="O que foi essa consulta" full value={sessaoForm.titulo} onChange={(v) => setSessaoForm((f) => ({ ...f, titulo: v }))} />
+                    <Field
+                      label="O que foi essa consulta" full
+                      value={sessaoForm.titulo}
+                      onChange={(v) => setSessaoForm((f) => ({ ...f, titulo: v }))}
+                    />
                   )}
                   <div style={{ marginTop: 12 }}>
                     <Field label="Data" type="date" value={sessaoForm.data} onChange={(v) => setSessaoForm((f) => ({ ...f, data: v }))} />
                   </div>
                   <div style={{ marginTop: 12 }}>
-                    <Field label="O que foi feito / observações" full value={sessaoForm.notas} onChange={(v) => setSessaoForm((f) => ({ ...f, notas: v }))} />
+                    <Field
+                      label="O que foi feito / observações" full
+                      value={sessaoForm.notas}
+                      onChange={(v) => setSessaoForm((f) => ({ ...f, notas: v }))}
+                    />
                   </div>
                   <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
                     <button style={styles.secondaryBtn} onClick={() => setShowSessaoForm(false)}>Cancelar</button>
@@ -8300,18 +8577,28 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
               {tipoInfo.etapas.length > 0 ? (
                 <div>
                   {etapasComStatus.map((e, i) => (
-                    <div key={i} style={{ display: "flex", gap: 12, padding: "12px 0", borderBottom: i < etapasComStatus.length - 1 ? "1px solid #E3DACB" : "none" }}>
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex", gap: 12, padding: "12px 0",
+                        borderBottom: i < etapasComStatus.length - 1 ? "1px solid #E3DACB" : "none"
+                      }}
+                    >
                       <div style={{ marginTop: 2, flexShrink: 0 }}>
                         {e.feita ? <CheckCircle2 size={18} color="#918567" /> : <Clock size={18} color="#CFC7B6" />}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                           <div style={{ fontWeight: 600, color: "#16332E" }}>{e.titulo}</div>
-                          <div style={{ fontSize: 12, color: "#9C9284" }}>{e.feita ? formatData(e.sessao.data) : `previsto: ${formatData(e.dataPrevista)}`}</div>
+                          <div style={{ fontSize: 12, color: "#9C9284" }}>
+                            {e.feita ? formatData(e.sessao.data) : `previsto: ${formatData(e.dataPrevista)}`}
+                          </div>
                         </div>
                         <div style={{ fontSize: 13, color: "#6E6355", marginTop: 2 }}>{e.descricao}</div>
                         {e.feita && e.sessao.notas && (
-                          <div style={{ fontSize: 13, color: "#4B615D", marginTop: 6, background: "#F6F0E7", padding: "8px 10px", borderRadius: 8 }}>{e.sessao.notas}</div>
+                          <div style={{ fontSize: 13, color: "#4B615D", marginTop: 6, background: "#F6F0E7", padding: "8px 10px", borderRadius: 8 }}>
+                            {e.sessao.notas}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -8319,7 +8606,9 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                 </div>
               ) : (
                 <div>
-                  {(!patient.sessoes || patient.sessoes.length === 0) && <div style={styles.emptyRow}>Nenhuma consulta registrada ainda.</div>}
+                  {(!patient.sessoes || patient.sessoes.length === 0) && (
+                    <div style={styles.emptyRow}>Nenhuma consulta registrada ainda.</div>
+                  )}
                   {(patient.sessoes || []).slice().reverse().map((s) => (
                     <div key={s.id} style={styles.timelineItem}>
                       <div style={styles.timelineDot} />
@@ -8357,12 +8646,21 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
               </div>
             </div>
           )}
+
           {tab === "acompanhamento" && patient.acompanhamento && (
             <div>
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>Tipo de acompanhamento</div>
-                <select value={patient.acompanhamento.tipoId || "avulso"} onChange={(e) => onSetTipoAcompanhamento(e.target.value)} style={styles.input}>
-                  {TIPOS_ACOMPANHAMENTO.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                  Tipo de acompanhamento
+                </div>
+                <select
+                  value={patient.acompanhamento.tipoId || "avulso"}
+                  onChange={(e) => onSetTipoAcompanhamento(e.target.value)}
+                  style={styles.input}
+                >
+                  {TIPOS_ACOMPANHAMENTO.map((t) => (
+                    <option key={t.id} value={t.id}>{t.label}</option>
+                  ))}
                 </select>
                 <div style={{ fontSize: 12, color: "#9C9284", marginTop: 6 }}>{tipoInfo.descricao}</div>
               </div>
@@ -8390,7 +8688,9 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                     <div key={pg.id} style={styles.evoRow} className="evo-row">
                       <div style={{ fontSize: 12, color: "#9C9284", width: 90 }}>{formatData(pg.data)}</div>
                       <div style={{ fontSize: 13, color: "#867A6E", fontWeight: 600, width: 100 }}>{formatMoeda(pg.valor)}</div>
-                      <div style={{ fontSize: 13, color: "#6E6355" }}>{pg.formaPagamento}{pg.tipo === "avulso" ? " · Avulso" : ""}</div>
+                      <div style={{ fontSize: 13, color: "#6E6355" }}>
+                        {pg.formaPagamento}{pg.tipo === "avulso" ? " · Avulso" : ""}
+                      </div>
                     </div>
                   ))}
                 </>
@@ -8406,7 +8706,10 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
           patients={[patient]}
           target={{ patientId: patient.id, mode: "parcela" }}
           onClose={() => setShowPayment(false)}
-          onSave={(patientId, pagamento) => { onAddPagamento(pagamento); setShowPayment(false); }}
+          onSave={(patientId, pagamento) => {
+            onAddPagamento(pagamento);
+            setShowPayment(false);
+          }}
         />
       )}
     </>
@@ -8426,6 +8729,9 @@ function InfoGrid({ items }) {
   );
 }
 
+/* ---------------------------------------------------------
+   Novo paciente
+--------------------------------------------------------- */
 function NewPatientModal({ onClose, onSave }) {
   const [form, setForm] = useState({
     nome: "", dataNascimento: "", sexo: "F", escola: "", diagnostico: "",
@@ -8444,7 +8750,9 @@ function NewPatientModal({ onClose, onSave }) {
   const setIdade = (anos, meses) => {
     setIdadeAnos(anos);
     setIdadeMeses(meses);
-    if (anos !== "" || meses !== "") set("dataNascimento", dataNascimentoDeIdade(anos || 0, meses || 0));
+    if (anos !== "" || meses !== "") {
+      set("dataNascimento", dataNascimentoDeIdade(anos || 0, meses || 0));
+    }
   };
 
   const setTelefone = (v) => {
@@ -8453,51 +8761,87 @@ function NewPatientModal({ onClose, onSave }) {
   };
 
   const submit = () => {
-    if (!form.nome.trim()) { setErro("Informe o nome da criança para salvar."); return; }
+    if (!form.nome.trim()) {
+      setErro("Informe o nome da criança para salvar.");
+      return;
+    }
     onSave({
       ...form,
       whatsapp: whatsappIgual ? form.telefone : form.whatsapp,
       tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
       pagamentos: [],
-      evolucao: [], sessoes: [], timeline: [{ data: new Date().toISOString().slice(0, 10), tipo: "nota", texto: "Paciente cadastrado no sistema." }],
-      acompanhamento: { tipoId: "avulso", tipo: "Consulta avulsa", dataInicio: new Date().toISOString().slice(0, 10), dataFim: "", consultasTotal: 1, consultasRealizadas: 0, valor: 0, formaPagamento: "Pix", parcelas: 1, status: "ativo" }
+      evolucao: [],
+      sessoes: [],
+      timeline: [{ data: new Date().toISOString().slice(0, 10), tipo: "nota", texto: "Paciente cadastrado no sistema." }],
+      acompanhamento: {
+        tipoId: "avulso", tipo: "Consulta avulsa", dataInicio: new Date().toISOString().slice(0, 10),
+        dataFim: "", consultasTotal: 1, consultasRealizadas: 0, valor: 0,
+        formaPagamento: "Pix", parcelas: 1, status: "ativo"
+      }
     });
   };
+
   return (
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.modal} className="modal" onClick={(e) => e.stopPropagation()}>
         <div style={styles.drawerHeader} className="drawer-header">
-          <div style={{ fontFamily: "Playfair Display, serif", fontSize: 20, fontWeight: 600, color: "#867A6E" }}>Novo paciente</div>
+          <div style={{ fontFamily: "Playfair Display, serif", fontSize: 20, fontWeight: 600, color: "#867A6E" }}>
+            Novo paciente
+          </div>
           <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
         <div className="new-patient-grid" style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, overflowY: "auto" }}>
           <Field label="Nome da criança *" value={form.nome} onChange={(v) => { set("nome", v); if (erro) setErro(""); }} full error={erro} />
           <Field label="Data de nascimento" type="date" value={form.dataNascimento} onChange={(v) => { set("dataNascimento", v); setIdadeAnos(""); setIdadeMeses(""); }} />
           <div>
-            <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>Ou informe a idade aproximada</div>
+            <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>
+              Ou informe a idade aproximada
+            </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <input type="number" min="0" placeholder="anos" value={idadeAnos} onChange={(e) => setIdade(e.target.value, idadeMeses)} style={{ ...styles.input, width: "50%" }} />
-              <input type="number" min="0" max="11" placeholder="meses" value={idadeMeses} onChange={(e) => setIdade(idadeAnos, e.target.value)} style={{ ...styles.input, width: "50%" }} />
+              <input
+                type="number" min="0" placeholder="anos"
+                value={idadeAnos}
+                onChange={(e) => setIdade(e.target.value, idadeMeses)}
+                style={{ ...styles.input, width: "50%" }}
+              />
+              <input
+                type="number" min="0" max="11" placeholder="meses"
+                value={idadeMeses}
+                onChange={(e) => setIdade(idadeAnos, e.target.value)}
+                style={{ ...styles.input, width: "50%" }}
+              />
             </div>
           </div>
           <Field label="Sexo" type="select" options={["F", "M"]} value={form.sexo} onChange={(v) => set("sexo", v)} />
           <Field label="Responsável" value={form.responsavel} onChange={(v) => set("responsavel", v)} full />
           <Field label="Telefone / WhatsApp" value={form.telefone} onChange={setTelefone} />
+
           <div>
             <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>WhatsApp</div>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#6E6355", marginBottom: 6 }}>
-              <input type="checkbox" checked={whatsappIgual}
-                onChange={(e) => { setWhatsappIgual(e.target.checked); if (e.target.checked) set("whatsapp", form.telefone); }} />
+              <input
+                type="checkbox"
+                checked={whatsappIgual}
+                onChange={(e) => { setWhatsappIgual(e.target.checked); if (e.target.checked) set("whatsapp", form.telefone); }}
+              />
               Mesmo número
             </label>
             {!whatsappIgual && (
               <input value={form.whatsapp} onChange={(e) => set("whatsapp", maskTelefone(e.target.value))} style={styles.input} />
             )}
           </div>
-          <button type="button" onClick={() => setShowMais((v) => !v)}
-            style={{ gridColumn: "1 / -1", background: "none", border: "none", color: "#867A6E", fontSize: 12.5, fontWeight: 600, textAlign: "left", padding: "6px 0", cursor: "pointer" }}>
+
+          <button
+            type="button"
+            onClick={() => setShowMais((v) => !v)}
+            style={{
+              gridColumn: "1 / -1", background: "none", border: "none", color: "#867A6E",
+              fontSize: 12.5, fontWeight: 600, textAlign: "left", padding: "6px 0", cursor: "pointer"
+            }}
+          >
             {showMais ? "− Ocultar detalhes clínicos e de contato" : "+ Adicionar detalhes clínicos e de contato"}
           </button>
+
           {showMais && (
             <>
               <Field label="Diagnóstico" value={form.diagnostico} onChange={(v) => set("diagnostico", v)} full />
@@ -8529,25 +8873,39 @@ function Field({ label, value, onChange, type = "text", options, full, error }) 
           {options.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
       ) : (
-        <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
-          style={{ ...styles.input, ...(error ? { border: "1px solid #A99790" } : {}) }} />
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ ...styles.input, ...(error ? { border: "1px solid #A99790" } : {}) }}
+        />
       )}
       {error && <div style={{ fontSize: 11.5, color: "#A99790", marginTop: 4 }}>{error}</div>}
     </div>
   );
 }
 
+/* ---------------------------------------------------------
+   Agenda
+--------------------------------------------------------- */
 function Agenda({ patients, events, onAdd, onUpdate, onDelete }) {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+
   const patientName = (id) => patients.find((p) => p.id === id)?.nome || "—";
 
   const ordenados = [...events].sort((a, b) => (a.data + (a.hora || "")).localeCompare(b.data + (b.hora || "")));
-  const porData = ordenados.reduce((acc, e) => { acc[e.data] = acc[e.data] || []; acc[e.data].push(e); return acc; }, {});
+  const porData = ordenados.reduce((acc, e) => {
+    acc[e.data] = acc[e.data] || [];
+    acc[e.data].push(e);
+    return acc;
+  }, {});
 
   return (
     <div>
-      <SectionTitle title="Agenda" subtitle="Consultas e retornos por data"
+      <SectionTitle
+        title="Agenda"
+        subtitle="Consultas e retornos por data"
         action={
           <button style={styles.primaryBtn} onClick={() => { setEditing(null); setShowModal(true); }}>
             <Plus size={16} /> Novo agendamento
@@ -8563,27 +8921,44 @@ function Agenda({ patients, events, onAdd, onUpdate, onDelete }) {
             </div>
             {lista.map((e) => (
               <div key={e.id} style={styles.agendaRow} className="agenda-row">
-                <CalendarIcon size={15} color={EVENT_STATUS_COLOR[e.status]} />
+                <Calendar size={15} color={EVENT_STATUS_COLOR[e.status]} />
                 <div className="agenda-name" style={{ fontWeight: 600, color: "#867A6E", width: 180 }}>
-                  {patientName(e.pacienteId)}{e.hora && <span style={{ color: "#9C9284", fontWeight: 400 }}> · {e.hora}</span>}
+                  {patientName(e.pacienteId)}
+                  {e.hora && <span style={{ color: "#9C9284", fontWeight: 400 }}> · {e.hora}</span>}
                 </div>
                 <div style={{ fontSize: 13, color: "#6E6355" }}>{e.tipo}</div>
-                <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20, background: EVENT_STATUS_COLOR[e.status] + "1F", color: EVENT_STATUS_COLOR[e.status] }}>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20,
+                  background: EVENT_STATUS_COLOR[e.status] + "1F", color: EVENT_STATUS_COLOR[e.status]
+                }}>
                   {EVENT_STATUS_LABEL[e.status]}
                 </span>
                 <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
                   {e.status === "agendado" && (
-                    <button title="Marcar como realizado" onClick={() => { if (window.confirm(`Confirmar que a consulta de ${patientName(e.pacienteId)} foi realizada?`)) onUpdate(e.id, { status: "realizado" }); }}
-                      style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#918567", cursor: "pointer" }}>
+                    <button
+                      title="Marcar como realizado"
+                      onClick={() => {
+                        if (window.confirm(`Confirmar que a consulta de ${patientName(e.pacienteId)} foi realizada?`)) {
+                          onUpdate(e.id, { status: "realizado" });
+                        }
+                      }}
+                      style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#918567", cursor: "pointer" }}
+                    >
                       <CheckCircle2 size={13} />
                     </button>
                   )}
-                  <button title="Editar" onClick={() => { setEditing(e); setShowModal(true); }}
-                    style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#6E6355", cursor: "pointer" }}>
+                  <button
+                    title="Editar"
+                    onClick={() => { setEditing(e); setShowModal(true); }}
+                    style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#6E6355", cursor: "pointer" }}
+                  >
                     <Pencil size={13} />
                   </button>
-                  <button title="Excluir" onClick={() => { if (window.confirm("Excluir este agendamento? Essa ação não pode ser desfeita.")) onDelete(e.id); }}
-                    style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#A99790", cursor: "pointer" }}>
+                  <button
+                    title="Excluir"
+                    onClick={() => { if (window.confirm("Excluir este agendamento? Essa ação não pode ser desfeita.")) onDelete(e.id); }}
+                    style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#A99790", cursor: "pointer" }}
+                  >
                     <Trash2 size={13} />
                   </button>
                 </div>
@@ -8592,12 +8967,17 @@ function Agenda({ patients, events, onAdd, onUpdate, onDelete }) {
           </div>
         ))}
       </div>
+
       {showModal && (
         <EventModal
           patients={patients}
           event={editing}
           onClose={() => setShowModal(false)}
-          onSave={(ev) => { if (editing) onUpdate(editing.id, ev); else onAdd(ev); setShowModal(false); }}
+          onSave={(ev) => {
+            if (editing) onUpdate(editing.id, ev);
+            else onAdd(ev);
+            setShowModal(false);
+          }}
         />
       )}
     </div>
@@ -8614,7 +8994,11 @@ function EventModal({ patients, event, onClose, onSave }) {
     obs: event?.obs || ""
   });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const submit = () => { if (!form.pacienteId || !form.data) return; onSave(form); };
+
+  const submit = () => {
+    if (!form.pacienteId || !form.data) return;
+    onSave(form);
+  };
 
   return (
     <div style={styles.overlay} onClick={onClose}>
@@ -8626,17 +9010,21 @@ function EventModal({ patients, event, onClose, onSave }) {
           <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
         <div className="new-patient-grid" style={{ padding: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Field label="Paciente" type="select" full
+          <Field
+            label="Paciente" type="select" full
             options={patients.map((p) => p.nome)}
             value={patients.find((p) => p.id === form.pacienteId)?.nome || ""}
-            onChange={(nome) => set("pacienteId", patients.find((p) => p.nome === nome)?.id)} />
+            onChange={(nome) => set("pacienteId", patients.find((p) => p.nome === nome)?.id)}
+          />
           <Field label="Data" type="date" value={form.data} onChange={(v) => set("data", v)} />
           <Field label="Hora" type="time" value={form.hora} onChange={(v) => set("hora", v)} />
           <Field label="Tipo" type="select" options={EVENT_TIPOS} value={form.tipo} onChange={(v) => set("tipo", v)} />
-          <Field label="Status" type="select"
+          <Field
+            label="Status" type="select"
             options={Object.values(EVENT_STATUS_LABEL)}
             value={EVENT_STATUS_LABEL[form.status]}
-            onChange={(label) => set("status", Object.keys(EVENT_STATUS_LABEL).find((k) => EVENT_STATUS_LABEL[k] === label))} />
+            onChange={(label) => set("status", Object.keys(EVENT_STATUS_LABEL).find((k) => EVENT_STATUS_LABEL[k] === label))}
+          />
           <Field label="Observações" value={form.obs} onChange={(v) => set("obs", v)} full />
         </div>
         <div className="modal-footer" style={{ padding: "16px 20px", borderTop: "1px solid #E3DACB", display: "flex", justifyContent: "flex-end", gap: 10 }}>
@@ -8648,24 +9036,37 @@ function EventModal({ patients, event, onClose, onSave }) {
   );
 }
 
+/* ---------------------------------------------------------
+   Follow-up (Kanban)
+--------------------------------------------------------- */
 function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarProspeccao }) {
   const [showModal, setShowModal] = useState(false);
   const patientName = (id) => patients.find((p) => p.id === id)?.nome || "—";
+
   return (
     <div>
-      <SectionTitle title="Follow-up" subtitle="Tarefas de relacionamento e cobrança"
+      <SectionTitle
+        title="Follow-up"
+        subtitle="Tarefas de relacionamento e cobrança"
         action={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button style={styles.secondaryBtn} onClick={onCriarProspeccao}><Clock size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Follow-up p/ prospecções (1 semana)</button>
-            <button style={styles.primaryBtn} onClick={() => setShowModal(true)}><Plus size={16} /> Novo follow-up</button>
+            <button style={styles.secondaryBtn} onClick={onCriarProspeccao}>
+              <Clock size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Follow-up p/ prospecções (1 semana)
+            </button>
+            <button style={styles.primaryBtn} onClick={() => setShowModal(true)}>
+              <Plus size={16} /> Novo follow-up
+            </button>
           </div>
-        } />
+        }
+      />
       <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 8 }}>
         {KANBAN_COLS.map((col) => {
           const items = followups.filter((f) => f.coluna === col.id);
           return (
             <div key={col.id} style={styles.kanbanCol} className="kanban-col">
-              <div style={styles.kanbanColHeader}>{col.label} <span style={{ color: "#9C9284", fontWeight: 400 }}>({items.length})</span></div>
+              <div style={styles.kanbanColHeader}>
+                {col.label} <span style={{ color: "#9C9284", fontWeight: 400 }}>({items.length})</span>
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {items.map((f) => (
                   <div key={f.id} style={styles.kanbanCard}>
@@ -8673,16 +9074,24 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#867A6E" }}>{f.titulo}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ width: 8, height: 8, borderRadius: 8, background: PRIORIDADE_COLOR[f.prioridade], marginTop: 4 }} />
-                        <button title="Excluir follow-up"
+                        <button
+                          title="Excluir follow-up"
                           onClick={() => { if (window.confirm("Excluir este follow-up? Essa ação não pode ser desfeita.")) onDelete(f.id); }}
-                          style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", padding: 0, display: "flex" }}>
+                          style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", padding: 0, display: "flex" }}
+                        >
                           <Trash2 size={13} />
                         </button>
                       </div>
                     </div>
                     <div style={{ fontSize: 12, color: "#9C9284", marginTop: 4 }}>{patientName(f.pacienteId)}</div>
-                    <div style={{ fontSize: 11, color: "#9C9284", marginTop: 6 }}>Prazo {formatData(f.prazo)} · {f.responsavel}</div>
-                    <select value={f.coluna} onChange={(e) => onMove(f.id, e.target.value)} style={styles.kanbanSelect}>
+                    <div style={{ fontSize: 11, color: "#9C9284", marginTop: 6 }}>
+                      Prazo {formatData(f.prazo)} · {f.responsavel}
+                    </div>
+                    <select
+                      value={f.coluna}
+                      onChange={(e) => onMove(f.id, e.target.value)}
+                      style={styles.kanbanSelect}
+                    >
                       {KANBAN_COLS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
                     </select>
                   </div>
@@ -8693,8 +9102,13 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
           );
         })}
       </div>
+
       {showModal && (
-        <FollowupModal patients={patients} onClose={() => setShowModal(false)} onSave={(f) => { onAdd(f); setShowModal(false); }} />
+        <FollowupModal
+          patients={patients}
+          onClose={() => setShowModal(false)}
+          onSave={(f) => { onAdd(f); setShowModal(false); }}
+        />
       )}
     </div>
   );
@@ -8702,34 +9116,54 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
 
 function FollowupModal({ patients, onClose, onSave }) {
   const [form, setForm] = useState({
-    pacienteId: patients[0]?.id || "", titulo: "", tipo: "Cobrar retorno", prioridade: "media",
-    prazo: new Date().toISOString().slice(0, 10), coluna: "afazer", responsavel: "Nutricionista"
+    pacienteId: patients[0]?.id || "",
+    titulo: "",
+    tipo: "Cobrar retorno",
+    prioridade: "media",
+    prazo: new Date().toISOString().slice(0, 10),
+    coluna: "afazer",
+    responsavel: "Nutricionista"
   });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const PRIORIDADE_LABEL = { alta: "Alta", media: "Média", baixa: "Baixa" };
-  const submit = () => { if (!form.pacienteId || !form.titulo.trim()) return; onSave(form); };
+
+  const submit = () => {
+    if (!form.pacienteId || !form.titulo.trim()) return;
+    onSave(form);
+  };
 
   return (
     <div style={styles.overlay} onClick={onClose}>
       <div style={{ ...styles.modal, width: 460 }} className="modal" onClick={(e) => e.stopPropagation()}>
         <div style={styles.drawerHeader} className="drawer-header">
-          <div style={{ fontFamily: "Playfair Display, serif", fontSize: 18, fontWeight: 600, color: "#16332E" }}>Novo follow-up</div>
+          <div style={{ fontFamily: "Playfair Display, serif", fontSize: 18, fontWeight: 600, color: "#16332E" }}>
+            Novo follow-up
+          </div>
           <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
         <div className="new-patient-grid" style={{ padding: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Field label="Paciente" type="select" full options={patients.map((p) => p.nome)}
+          <Field
+            label="Paciente" type="select" full
+            options={patients.map((p) => p.nome)}
             value={patients.find((p) => p.id === form.pacienteId)?.nome || ""}
-            onChange={(nome) => set("pacienteId", patients.find((p) => p.nome === nome)?.id)} />
+            onChange={(nome) => set("pacienteId", patients.find((p) => p.nome === nome)?.id)}
+          />
           <Field label="Título" full value={form.titulo} onChange={(v) => set("titulo", v)} />
           <Field label="Tipo" value={form.tipo} onChange={(v) => set("tipo", v)} />
           <Field label="Prazo" type="date" value={form.prazo} onChange={(v) => set("prazo", v)} />
-          <Field label="Prioridade" type="select" options={Object.values(PRIORIDADE_LABEL)}
+          <Field
+            label="Prioridade" type="select"
+            options={Object.values(PRIORIDADE_LABEL)}
             value={PRIORIDADE_LABEL[form.prioridade]}
-            onChange={(label) => set("prioridade", Object.keys(PRIORIDADE_LABEL).find((k) => PRIORIDADE_LABEL[k] === label))} />
+            onChange={(label) => set("prioridade", Object.keys(PRIORIDADE_LABEL).find((k) => PRIORIDADE_LABEL[k] === label))}
+          />
           <Field label="Responsável" value={form.responsavel} onChange={(v) => set("responsavel", v)} />
-          <Field label="Coluna" type="select" options={KANBAN_COLS.map((c) => c.label)}
+          <Field
+            label="Coluna" type="select"
+            options={KANBAN_COLS.map((c) => c.label)}
             value={KANBAN_COLS.find((c) => c.id === form.coluna)?.label || ""}
-            onChange={(label) => set("coluna", KANBAN_COLS.find((c) => c.label === label)?.id)} />
+            onChange={(label) => set("coluna", KANBAN_COLS.find((c) => c.label === label)?.id)}
+          />
         </div>
         <div className="modal-footer" style={{ padding: "16px 20px", borderTop: "1px solid #E3DACB", display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <button style={styles.secondaryBtn} onClick={onClose}>Cancelar</button>
@@ -8740,6 +9174,9 @@ function FollowupModal({ patients, onClose, onSave }) {
   );
 }
 
+/* ---------------------------------------------------------
+   Financeiro
+--------------------------------------------------------- */
 function Financeiro({ patients, onAddPagamento }) {
   const [paymentTarget, setPaymentTarget] = useState(null);
 
@@ -8763,9 +9200,14 @@ function Financeiro({ patients, onAddPagamento }) {
 
   return (
     <div>
-      <SectionTitle title="Financeiro" subtitle="Planos, pagamentos e inadimplência"
+      <SectionTitle
+        title="Financeiro"
+        subtitle="Planos, pagamentos e inadimplência"
         action={
-          <button style={styles.primaryBtn} onClick={() => rows[0] && setPaymentTarget({ patientId: rows[0].id, mode: "avulso" })}>
+          <button
+            style={styles.primaryBtn}
+            onClick={() => rows[0] && setPaymentTarget({ patientId: rows[0].id, mode: "avulso" })}
+          >
             <Plus size={16} /> Cobrança avulsa
           </button>
         }
@@ -8795,8 +9237,14 @@ function Financeiro({ patients, onAddPagamento }) {
             <div style={{ flex: 1 }} data-label="Status"><StatusPill status={r.status} /></div>
             <div style={{ width: 36 }} onClick={(e) => e.stopPropagation()}>
               {r.pendente > 0 && (
-                <button title="Registrar pagamento" onClick={() => setPaymentTarget({ patientId: r.id, mode: "parcela" })}
-                  style={{ background: "#EFE6D8", border: "none", borderRadius: 8, padding: 6, display: "flex", color: "#867A6E", cursor: "pointer" }}>
+                <button
+                  title="Registrar pagamento"
+                  onClick={() => setPaymentTarget({ patientId: r.id, mode: "parcela" })}
+                  style={{
+                    background: "#EFE6D8", border: "none", borderRadius: 8, padding: 6,
+                    display: "flex", color: "#867A6E", cursor: "pointer"
+                  }}
+                >
                   <DollarSign size={14} />
                 </button>
               )}
@@ -8824,7 +9272,10 @@ function Financeiro({ patients, onAddPagamento }) {
           patients={rows}
           target={paymentTarget}
           onClose={() => setPaymentTarget(null)}
-          onSave={(patientId, pagamento) => { onAddPagamento(patientId, pagamento); setPaymentTarget(null); }}
+          onSave={(patientId, pagamento) => {
+            onAddPagamento(patientId, pagamento);
+            setPaymentTarget(null);
+          }}
         />
       )}
     </div>
@@ -8834,9 +9285,10 @@ function Financeiro({ patients, onAddPagamento }) {
 function PaymentModal({ patients, target, onClose, onSave }) {
   const isAvulso = target.mode === "avulso";
   const patientInicial = patients.find((p) => p.id === target.patientId);
-  const sugestao = !isAvulso && patientInicial?.acompanhamento?.consultasTotal
-    ? Math.round((patientInicial.acompanhamento.valor / patientInicial.acompanhamento.consultasTotal) * 100) / 100
-    : "";
+  const sugestao =
+    !isAvulso && patientInicial?.acompanhamento?.consultasTotal
+      ? Math.round((patientInicial.acompanhamento.valor / patientInicial.acompanhamento.consultasTotal) * 100) / 100
+      : "";
 
   const [patientId, setPatientId] = useState(target.patientId || patients[0]?.id || "");
   const [valor, setValor] = useState(sugestao);
@@ -8846,7 +9298,10 @@ function PaymentModal({ patients, target, onClose, onSave }) {
 
   const submit = () => {
     if (!patientId || !valor || Number(valor) <= 0) return;
-    onSave(patientId, { id: uid(), data, valor: Number(valor), formaPagamento: forma, tipo: isAvulso ? "avulso" : "parcela", obs });
+    onSave(patientId, {
+      id: uid(), data, valor: Number(valor), formaPagamento: forma,
+      tipo: isAvulso ? "avulso" : "parcela", obs
+    });
   };
 
   return (
@@ -8860,9 +9315,13 @@ function PaymentModal({ patients, target, onClose, onSave }) {
         </div>
         <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
           {isAvulso && (
-            <Field label="Paciente" type="select" options={patients.map((p) => p.nome)}
+            <Field
+              label="Paciente"
+              type="select"
+              options={patients.map((p) => p.nome)}
               value={patients.find((p) => p.id === patientId)?.nome || ""}
-              onChange={(nome) => setPatientId(patients.find((p) => p.nome === nome)?.id)} />
+              onChange={(nome) => setPatientId(patients.find((p) => p.nome === nome)?.id)}
+            />
           )}
           <Field label="Valor (R$)" type="number" value={valor} onChange={setValor} />
           <Field label="Data" type="date" value={data} onChange={setData} />
@@ -8878,6 +9337,9 @@ function PaymentModal({ patients, target, onClose, onSave }) {
   );
 }
 
+/* ---------------------------------------------------------
+   Integrações — sincronização automática com a Google Agenda
+--------------------------------------------------------- */
 function Integracoes({
   googleClientId, setGoogleClientId, googleToken, gisReady, onConectar, onDesconectar, onSincronizarTudo, syncLog,
   onResetarBase, onSugerirTipos, patients, followups, events, setPatients, setFollowups, setEvents
@@ -9062,53 +9524,131 @@ function Integracoes({
   );
 }
 
+/* ---------------------------------------------------------
+   Estilos
+--------------------------------------------------------- */
 const styles = {
-  root: { display: "flex", minHeight: "100vh", background: "#F6F0E7", fontFamily: "Lato, sans-serif", color: "#867A6E" },
-  sidebar: { width: 230, background: "#FFFFFF", borderRight: "1px solid #E3DACB", padding: "22px 18px", display: "flex", flexDirection: "column", flexShrink: 0 },
+  root: {
+    display: "flex", minHeight: "100vh", background: "#F6F0E7",
+    fontFamily: "Lato, sans-serif", color: "#867A6E"
+  },
+  sidebar: {
+    width: 230, background: "#FFFFFF", borderRight: "1px solid #E3DACB",
+    padding: "22px 18px", display: "flex", flexDirection: "column", flexShrink: 0
+  },
   logo: { display: "flex", alignItems: "center", gap: 10, paddingBottom: 4 },
-  newBtn: { marginTop: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "#867A6E", color: "#F6F0E7", border: "none", borderRadius: 8, padding: "10px 12px", fontSize: 13, fontWeight: 600 },
-  navItem: { display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: 8, fontSize: 13.5, fontWeight: 500, marginBottom: 3, cursor: "pointer" },
-  sidebarFooter: { marginTop: "auto", fontSize: 11.5, color: "#9C9284", lineHeight: 1.5, borderTop: "1px solid #E3DACB", paddingTop: 14 },
+  newBtn: {
+    marginTop: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+    background: "#867A6E", color: "#F6F0E7", border: "none", borderRadius: 8,
+    padding: "10px 12px", fontSize: 13, fontWeight: 600
+  },
+  navItem: {
+    display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
+    borderRadius: 8, fontSize: 13.5, fontWeight: 500, marginBottom: 3, cursor: "pointer"
+  },
+  sidebarFooter: {
+    marginTop: "auto", fontSize: 11.5, color: "#9C9284", lineHeight: 1.5,
+    borderTop: "1px solid #E3DACB", paddingTop: 14
+  },
   main: { flex: 1, display: "flex", flexDirection: "column", minWidth: 0 },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 28px", borderBottom: "1px solid #E3DACB", background: "#FFFFFF" },
-  searchInput: { width: "100%", padding: "9px 12px 9px 34px", borderRadius: 8, border: "1px solid #E3DACB", fontSize: 13, outline: "none", background: "#F6F0E7" },
+  header: {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: "16px 28px", borderBottom: "1px solid #E3DACB", background: "#FFFFFF"
+  },
+  searchInput: {
+    width: "100%", padding: "9px 12px 9px 34px", borderRadius: 8,
+    border: "1px solid #E3DACB", fontSize: 13, outline: "none", background: "#F6F0E7"
+  },
   content: { padding: 28, overflowY: "auto", flex: 1 },
-  cardsGrid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 22 },
-  metricCard: { background: "#FFFFFF", border: "1px solid #E3DACB", borderRadius: 12, padding: 16, display: "flex", alignItems: "center", gap: 12 },
-  metricIcon: { width: 36, height: 36, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  cardsGrid: {
+    display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 22
+  },
+  metricCard: {
+    background: "#FFFFFF", border: "1px solid #E3DACB", borderRadius: 12,
+    padding: 16, display: "flex", alignItems: "center", gap: 12
+  },
+  metricIcon: {
+    width: 36, height: 36, borderRadius: 9, display: "flex",
+    alignItems: "center", justifyContent: "center", flexShrink: 0
+  },
   metricValue: { fontSize: 19, fontWeight: 700, color: "#867A6E", lineHeight: 1.2 },
   metricLabel: { fontSize: 12, color: "#9C9284", marginTop: 1 },
   chartsGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 22 },
-  panel: { background: "#FFFFFF", border: "1px solid #E3DACB", borderRadius: 12, padding: 20, marginBottom: 14 },
+  panel: {
+    background: "#FFFFFF", border: "1px solid #E3DACB", borderRadius: 12,
+    padding: 20, marginBottom: 14
+  },
   panelTitle: { fontSize: 14, fontWeight: 700, color: "#867A6E", marginBottom: 12 },
   emptyRow: { fontSize: 13, color: "#9C9284", padding: "10px 0" },
-  riskRow: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #EFE6D8", cursor: "pointer" },
-  tableHeader: { display: "flex", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4, color: "#9C9284", padding: "0 0 10px", borderBottom: "1px solid #E3DACB", marginBottom: 4 },
-  tableRow: { display: "flex", alignItems: "center", padding: "13px 0", borderBottom: "1px solid #EFE6D8", cursor: "pointer" },
-  primaryBtn: { display: "flex", alignItems: "center", gap: 6, background: "#867A6E", color: "#F6F0E7", border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600 },
-  secondaryBtn: { background: "#FFFFFF", color: "#867A6E", border: "1px solid #E3DACB", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600 },
-  overlay: { position: "fixed", inset: 0, background: "rgba(134,122,110,0.35)", display: "flex", justifyContent: "flex-end", zIndex: 50 },
-  drawer: { width: 640, maxWidth: "94vw", background: "#F6F0E7", height: "100%", display: "flex", flexDirection: "column", boxShadow: "-8px 0 24px rgba(0,0,0,0.08)" },
-  drawerHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "20px 24px", borderBottom: "1px solid #E3DACB", background: "#FFFFFF" },
-  iconBtn: { background: "#EFE6D8", border: "none", borderRadius: 8, padding: 7, display: "flex", color: "#6E6355" },
+  riskRow: {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: "10px 0", borderBottom: "1px solid #EFE6D8", cursor: "pointer"
+  },
+  tableHeader: {
+    display: "flex", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4,
+    color: "#9C9284", padding: "0 0 10px", borderBottom: "1px solid #E3DACB", marginBottom: 4
+  },
+  tableRow: {
+    display: "flex", alignItems: "center", padding: "13px 0",
+    borderBottom: "1px solid #EFE6D8", cursor: "pointer"
+  },
+  primaryBtn: {
+    display: "flex", alignItems: "center", gap: 6, background: "#867A6E", color: "#F6F0E7",
+    border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600
+  },
+  secondaryBtn: {
+    background: "#FFFFFF", color: "#867A6E", border: "1px solid #E3DACB",
+    borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600
+  },
+  overlay: {
+    position: "fixed", inset: 0, background: "rgba(134,122,110,0.35)",
+    display: "flex", justifyContent: "flex-end", zIndex: 50
+  },
+  drawer: {
+    width: 640, maxWidth: "94vw", background: "#F6F0E7", height: "100%",
+    display: "flex", flexDirection: "column", boxShadow: "-8px 0 24px rgba(0,0,0,0.08)"
+  },
+  drawerHeader: {
+    display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+    padding: "20px 24px", borderBottom: "1px solid #E3DACB", background: "#FFFFFF"
+  },
+  iconBtn: {
+    background: "#EFE6D8", border: "none", borderRadius: 8, padding: 7,
+    display: "flex", color: "#6E6355"
+  },
   divider: { height: 1, background: "#E3DACB", margin: "18px 0" },
   miniTitle: { fontSize: 11, color: "#9C9284", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 },
-  tagPill: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, background: "#EFE6D8", color: "#6E6355", padding: "4px 9px", borderRadius: 20 },
+  tagPill: {
+    display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5,
+    background: "#EFE6D8", color: "#6E6355", padding: "4px 9px", borderRadius: 20
+  },
   timelineItem: { display: "flex", gap: 12, paddingBottom: 18, position: "relative" },
-  timelineDot: { width: 8, height: 8, borderRadius: 8, background: "#918567", marginTop: 5, flexShrink: 0 },
-  evoRow: { display: "flex", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #EFE6D8" },
-  modal: { margin: "auto", width: 620, maxWidth: "94vw", maxHeight: "88vh", background: "#F6F0E7", borderRadius: 14, display: "flex", flexDirection: "column", boxShadow: "0 20px 50px rgba(0,0,0,0.2)" },
-  input: { width: "100%", padding: "9px 11px", borderRadius: 8, border: "1px solid #E3DACB", fontSize: 13.5, outline: "none", background: "#FFFFFF" },
-  agendaRow: { display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: "1px solid #EFE6D8" },
-  kanbanCol: { background: "#EFE6D8", borderRadius: 12, padding: 12, width: 240, flexShrink: 0, minHeight: 300 },
+  timelineDot: {
+    width: 8, height: 8, borderRadius: 8, background: "#918567", marginTop: 5, flexShrink: 0
+  },
+  evoRow: {
+    display: "flex", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #EFE6D8"
+  },
+  modal: {
+    margin: "auto", width: 620, maxWidth: "94vw", maxHeight: "88vh", background: "#F6F0E7",
+    borderRadius: 14, display: "flex", flexDirection: "column", boxShadow: "0 20px 50px rgba(0,0,0,0.2)"
+  },
+  input: {
+    width: "100%", padding: "9px 11px", borderRadius: 8, border: "1px solid #E3DACB",
+    fontSize: 13.5, outline: "none", background: "#FFFFFF"
+  },
+  agendaRow: {
+    display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: "1px solid #EFE6D8"
+  },
+  kanbanCol: {
+    background: "#EFE6D8", borderRadius: 12, padding: 12, width: 240, flexShrink: 0, minHeight: 300
+  },
   kanbanColHeader: { fontSize: 12.5, fontWeight: 700, color: "#867A6E", marginBottom: 10 },
-  kanbanCard: { background: "#FFFFFF", border: "1px solid #E3DACB", borderRadius: 10, padding: 10 },
-  kanbanSelect: { marginTop: 8, width: "100%", fontSize: 11, padding: "5px 6px", borderRadius: 6, border: "1px solid #E3DACB", background: "#F6F0E7", color: "#6E6355" }
+  kanbanCard: {
+    background: "#FFFFFF", border: "1px solid #E3DACB", borderRadius: 10, padding: 10
+  },
+  kanbanSelect: {
+    marginTop: 8, width: "100%", fontSize: 11, padding: "5px 6px", borderRadius: 6,
+    border: "1px solid #E3DACB", background: "#F6F0E7", color: "#6E6355"
+  }
 };
-
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);
-
-</script>
-</body>
-</html>
