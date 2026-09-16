@@ -954,6 +954,14 @@ function App() {
           const dataNascimento = parseIdadeTexto(campo(row, "Idade atualizada")) || parseIdadeTexto(campo(row, "Idade")) || "";
           const statusPaciente = /^alta$/i.test(statusAgendamento) ? "concluido" : "ativo";
 
+          // Tenta identificar o tipo de acompanhamento pelo texto das observações,
+          // já que a planilha não tem uma coluna própria pra isso.
+          let tipoIdInferido = "avulso";
+          if (/seletividade/i.test(obs)) tipoIdInferido = "seletividade";
+          else if (/introdu[cç][aã]o alimentar/i.test(obs)) tipoIdInferido = "introducao_alimentar";
+          else if (/trilhar/i.test(obs)) tipoIdInferido = "trilhar";
+          const tipoInfoInferido = TIPOS_ACOMPANHAMENTO.find((t) => t.id === tipoIdInferido);
+
           let nomes = [nomeRaw || (mae ? `Filho(a) de ${mae}` : "")];
           const m = nomeRaw.match(/^(.+?)\s+e\s+(.+)$/i);
           if (m && !nomeRaw.includes("(")) nomes = [m[1].trim(), m[2].trim()];
@@ -973,6 +981,8 @@ function App() {
                 id: existente.id,
                 patch: {
                   ultimoContato: ultimoContato || existente.ultimoContato,
+                  proximaConsultaPrevista: proxima || existente.proximaConsultaPrevista,
+                  observacoes: obs || existente.observacoes,
                   status: statusPaciente === "concluido" ? "concluido" : existente.status,
                   tags: Array.from(new Set([...(existente.tags || []), ...tags])),
                   timeline: obs
@@ -985,11 +995,14 @@ function App() {
                 id: uid(), nome, dataNascimento, sexo: "F", escola: "", diagnostico: "",
                 alergias: "", medicamentos: "", pediatra: "", responsavel: mae,
                 telefone, whatsapp: telefone, email: "", endereco: "", tags, status: statusPaciente,
-                ultimoContato, pagamentos: [], evolucao: [], sessoes: [],
+                ultimoContato, proximaConsultaPrevista: proxima, observacoes: obs,
+                pagamentos: [], evolucao: [], sessoes: [],
                 timeline: obs ? [{ data: ultimoContato || new Date().toISOString().slice(0, 10), tipo: "nota", texto: obs }] : [],
                 acompanhamento: {
-                  tipoId: "avulso", tipo: "Consulta avulsa", dataInicio: ultimoContato, dataFim: "",
-                  consultasTotal: 1, consultasRealizadas: 1, valor: 0, formaPagamento: "Pix", parcelas: 1, status: statusPaciente
+                  tipoId: tipoIdInferido, tipo: tipoInfoInferido ? tipoInfoInferido.label : "Consulta avulsa",
+                  dataInicio: ultimoContato, dataFim: "",
+                  consultasTotal: tipoInfoInferido?.etapas?.length || 1, consultasRealizadas: 1,
+                  valor: 0, formaPagamento: "Pix", parcelas: 1, status: statusPaciente
                 }
               };
               novosPacientes.push(novoPaciente);
@@ -1049,6 +1062,7 @@ function App() {
           });
         });
       }
+
       if (novosPacientes.length === 0 && atualizacoes.length === 0) {
         window.alert(
           "Nenhum paciente novo ou atualização encontrada. Confira se a planilha tem pelo menos uma aba com as colunas \"Nome da criança\" e \"Status do agendamento\" (pacientes) ou \"Nome da criança (se souber)\" / \"Status da negociação\" (prospecções) — não precisa ser o nome exato da aba, só as colunas."
@@ -2099,6 +2113,7 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
       email: patient.email || "",
       endereco: patient.endereco || "",
       dificuldadeAlimentar: patient.dificuldadeAlimentar || "",
+      observacoes: patient.observacoes || "",
       corFavorita: patient.corFavorita || "",
       personagensFavoritos: patient.personagensFavoritos || "",
       tags: (patient.tags || []).join(", ")
@@ -2204,6 +2219,8 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                 ["Sexo", patient.sexo === "F" ? "Feminino" : "Masculino"],
                 ["Peso atual", patient.evolucao?.length ? `${patient.evolucao[patient.evolucao.length - 1].peso} kg` : "-"],
                 ["Altura atual", patient.evolucao?.length ? `${patient.evolucao[patient.evolucao.length - 1].altura} cm` : "-"],
+                ["Último contato", formatData(patient.ultimoContato)],
+                ["Próxima consulta prevista", formatData(patient.proximaConsultaPrevista)],
                 ["Escola", patient.escola],
                 ["Diagnóstico", patient.diagnostico],
                 ["Dificuldade alimentar", patient.dificuldadeAlimentar],
@@ -2214,6 +2231,12 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                 ["Personagens favoritos", patient.personagensFavoritos],
                 ["Origem", patient.origem]
               ]} />
+              {patient.observacoes && (
+                <div style={{ marginTop: 12, padding: "10px 14px", background: "#EFE6D8", borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, color: "#9C9284", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 }}>Observações</div>
+                  <div style={{ fontSize: 13.5, color: "#4B615D", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{patient.observacoes}</div>
+                </div>
+              )}
               <div style={styles.divider} />
               <div style={styles.miniTitle}>Contato e responsável</div>
               <InfoGrid items={[
@@ -2321,6 +2344,7 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                 />
                 <Field label="Diagnóstico" value={editForm.diagnostico} onChange={(v) => setEditForm((f) => ({ ...f, diagnostico: v }))} full />
                 <Field label="Dificuldade alimentar" value={editForm.dificuldadeAlimentar} onChange={(v) => setEditForm((f) => ({ ...f, dificuldadeAlimentar: v }))} full />
+                <Field label="Observações" value={editForm.observacoes} onChange={(v) => setEditForm((f) => ({ ...f, observacoes: v }))} full />
                 <Field label="Alergias" value={editForm.alergias} onChange={(v) => setEditForm((f) => ({ ...f, alergias: v }))} />
                 <Field label="Medicamentos" value={editForm.medicamentos} onChange={(v) => setEditForm((f) => ({ ...f, medicamentos: v }))} />
                 <Field label="Escola" value={editForm.escola} onChange={(v) => setEditForm((f) => ({ ...f, escola: v }))} />
@@ -2741,7 +2765,7 @@ function NewPatientModal({ onClose, onSave }) {
     nome: "", dataNascimento: "", sexo: "F", escola: "", diagnostico: "",
     alergias: "", medicamentos: "", pediatra: "", responsavel: "",
     telefone: "", whatsapp: "", email: "", endereco: "", tags: "", origem: "",
-    dificuldadeAlimentar: "", corFavorita: "", personagensFavoritos: "",
+    dificuldadeAlimentar: "", corFavorita: "", personagensFavoritos: "", observacoes: "",
     status: "ativo", ultimoContato: new Date().toISOString().slice(0, 10)
   });
   const [whatsappIgual, setWhatsappIgual] = useState(true);
