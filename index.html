@@ -883,9 +883,42 @@ function App() {
         if (key) existentesPorTelefone[key] = p;
       });
 
-      const sheetPac = wb.Sheets["Pacientes"] || wb.Sheets[wb.SheetNames[0]];
-      if (sheetPac) {
-        const rows = XLSXlib.utils.sheet_to_json(sheetPac, { defval: "" });
+      // Detecta as abas de "pacientes ativos" e "prospecção" pelo CONTEÚDO das colunas,
+      // não pelo nome da aba — assim funciona não importa como as abas estão nomeadas,
+      // e junta várias abas de prospecção em uma lista só, se houver mais de uma.
+      const linhasPacientes = [];
+      const linhasProspeccao = [];
+      for (const nomeAba of wb.SheetNames) {
+        const planilha = wb.Sheets[nomeAba];
+        const linhas = XLSXlib.utils.sheet_to_json(planilha, { defval: "" });
+        if (!linhas.length) continue;
+        const colunas = Object.keys(linhas[0]);
+        const ehPacientes = colunas.includes("Nome da criança") && colunas.some((c) => /status do agendamento/i.test(c));
+        const ehProspeccao = colunas.some((c) => /nome da criança\s*\(se souber\)/i.test(c)) || colunas.some((c) => /status da negocia[cç][aã]o/i.test(c));
+        if (ehPacientes) linhasPacientes.push(...linhas);
+        else if (ehProspeccao) linhasProspeccao.push(...linhas);
+      }
+      // Se a detecção por coluna não encontrou nada, tenta pelo nome da aba (comportamento antigo)
+      if (linhasPacientes.length === 0 && linhasProspeccao.length === 0) {
+        const sheetPacAntigo = wb.Sheets["Pacientes"] || wb.Sheets[wb.SheetNames[0]];
+        const sheetProAntigo = wb.Sheets["Ainda não fecharam"];
+        if (sheetPacAntigo) linhasPacientes.push(...XLSXlib.utils.sheet_to_json(sheetPacAntigo, { defval: "" }));
+        if (sheetProAntigo) linhasProspeccao.push(...XLSXlib.utils.sheet_to_json(sheetProAntigo, { defval: "" }));
+      }
+
+      const parseIdadeTexto = (texto) => {
+        if (!texto) return null;
+        const t = String(texto);
+        const anosMatch = t.match(/(\d+)\s*anos?/i);
+        const mesesMatch = t.match(/(\d+)\s*mes(es)?/i);
+        if (!anosMatch && !mesesMatch) return null;
+        const anos = anosMatch ? parseInt(anosMatch[1], 10) : 0;
+        const meses = mesesMatch ? parseInt(mesesMatch[1], 10) : 0;
+        return dataNascimentoDeIdade(anos, meses);
+      };
+
+      {
+        const rows = linhasPacientes;
         rows.forEach((row) => {
           const nomeRaw = String(row["Nome da criança"] || "").trim();
           const mae = String(row["Nome da mãe/responsável"] || "").trim();
@@ -900,6 +933,8 @@ function App() {
           const freq = row["Frequência de retorno (dias)"];
           const statusAgendamento = String(row["Status do agendamento"] || "").trim();
           const obs = String(row["Observações"] || "").trim();
+          const dataNascimento = parseIdadeTexto(row["Idade atualizada"]) || parseIdadeTexto(row["Idade"]) || "";
+          const statusPaciente = /^alta$/i.test(statusAgendamento) ? "concluido" : "ativo";
 
           let nomes = [nomeRaw];
           const m = nomeRaw.match(/^(.+?)\s+e\s+(.+)$/i);
@@ -920,6 +955,7 @@ function App() {
                 id: existente.id,
                 patch: {
                   ultimoContato: ultimoContato || existente.ultimoContato,
+                  status: statusPaciente === "concluido" ? "concluido" : existente.status,
                   tags: Array.from(new Set([...(existente.tags || []), ...tags])),
                   timeline: obs
                     ? [...(existente.timeline || []), { data: ultimoContato || new Date().toISOString().slice(0, 10), tipo: "nota", texto: obs }]
@@ -928,19 +964,19 @@ function App() {
               });
             } else {
               const novoPaciente = {
-                id: uid(), nome, dataNascimento: "", sexo: "F", escola: "", diagnostico: "",
+                id: uid(), nome, dataNascimento, sexo: "F", escola: "", diagnostico: "",
                 alergias: "", medicamentos: "", pediatra: "", responsavel: mae,
-                telefone, whatsapp: telefone, email: "", endereco: "", tags, status: "ativo",
+                telefone, whatsapp: telefone, email: "", endereco: "", tags, status: statusPaciente,
                 ultimoContato, pagamentos: [], evolucao: [], sessoes: [],
                 timeline: obs ? [{ data: ultimoContato || new Date().toISOString().slice(0, 10), tipo: "nota", texto: obs }] : [],
                 acompanhamento: {
                   tipoId: "avulso", tipo: "Consulta avulsa", dataInicio: ultimoContato, dataFim: "",
-                  consultasTotal: 1, consultasRealizadas: 1, valor: 0, formaPagamento: "Pix", parcelas: 1, status: "ativo"
+                  consultasTotal: 1, consultasRealizadas: 1, valor: 0, formaPagamento: "Pix", parcelas: 1, status: statusPaciente
                 }
               };
               novosPacientes.push(novoPaciente);
               if (telefoneDigits) existentesPorTelefone[telefoneDigits] = novoPaciente;
-              if (proxima) {
+              if (proxima && statusPaciente === "ativo") {
                 novosEventos.push({ id: uid(), pacienteId: novoPaciente.id, data: proxima, hora: "", tipo: "Retorno", status: "agendado", obs: "" });
               }
             }
@@ -948,9 +984,8 @@ function App() {
         });
       }
 
-      const sheetPro = wb.Sheets["Ainda não fecharam"];
-      if (sheetPro) {
-        const rows = XLSXlib.utils.sheet_to_json(sheetPro, { defval: "" });
+      {
+        const rows = linhasProspeccao;
         rows.forEach((row) => {
           const mae = String(row["Nome da mãe/responsável"] || "").trim();
           const filhoRaw = String(row["Nome da criança (se souber)"] || "").trim();
@@ -964,7 +999,7 @@ function App() {
           const telefone = formatPhoneBR(telefoneRaw);
           const ultimo = excelDateToISO(row["Data do último contato"]);
           const statusNeg = String(row["Status da negociação"] || "").trim();
-          const obs = String(row["Observações (o que foi conversado / objeção)"] || "").trim();
+          const obs = String(row["Observações (o que foi conversado / objeção)"] || row["Observações"] || "").trim();
 
           let idadeAnos = null;
           let filhoBase = filhoRaw;
@@ -996,10 +1031,9 @@ function App() {
           });
         });
       }
-
       if (novosPacientes.length === 0 && atualizacoes.length === 0) {
         window.alert(
-          "Nenhum paciente novo ou atualização encontrada. Confira se a planilha tem uma aba \"Pacientes\" (e opcionalmente \"Ainda não fecharam\") com as colunas do modelo."
+          "Nenhum paciente novo ou atualização encontrada. Confira se a planilha tem pelo menos uma aba com as colunas \"Nome da criança\" e \"Status do agendamento\" (pacientes) ou \"Nome da criança (se souber)\" / \"Status da negociação\" (prospecções) — não precisa ser o nome exato da aba, só as colunas."
         );
         return;
       }
