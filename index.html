@@ -883,6 +883,23 @@ function App() {
         if (key) existentesPorTelefone[key] = p;
       });
 
+      // Normaliza nomes de coluna (ignora maiúsculas/minúsculas, acentos e espaços
+      // extras) pra planilha funcionar mesmo com pequenas variações no cabeçalho.
+      const normalizarTexto = (s) =>
+        String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+      const normalizarLinha = (row) => {
+        const nova = {};
+        Object.keys(row).forEach((k) => { nova[normalizarTexto(k)] = row[k]; });
+        return nova;
+      };
+      const campo = (linhaNormalizada, ...chaves) => {
+        for (const chave of chaves) {
+          const v = linhaNormalizada[normalizarTexto(chave)];
+          if (v !== undefined && v !== null && v !== "") return v;
+        }
+        return "";
+      };
+
       // Detecta as abas de "pacientes ativos" e "prospecção" pelo CONTEÚDO das colunas,
       // não pelo nome da aba — assim funciona não importa como as abas estão nomeadas,
       // e junta várias abas de prospecção em uma lista só, se houver mais de uma.
@@ -890,11 +907,12 @@ function App() {
       const linhasProspeccao = [];
       for (const nomeAba of wb.SheetNames) {
         const planilha = wb.Sheets[nomeAba];
-        const linhas = XLSXlib.utils.sheet_to_json(planilha, { defval: "" });
-        if (!linhas.length) continue;
+        const linhasBrutas = XLSXlib.utils.sheet_to_json(planilha, { defval: "" });
+        if (!linhasBrutas.length) continue;
+        const linhas = linhasBrutas.map(normalizarLinha);
         const colunas = Object.keys(linhas[0]);
-        const ehPacientes = colunas.includes("Nome da criança") && colunas.some((c) => /status do agendamento/i.test(c));
-        const ehProspeccao = colunas.some((c) => /nome da criança\s*\(se souber\)/i.test(c)) || colunas.some((c) => /status da negocia[cç][aã]o/i.test(c));
+        const ehPacientes = colunas.includes(normalizarTexto("Nome da criança")) && colunas.some((c) => c.includes("status do agendamento"));
+        const ehProspeccao = colunas.some((c) => c.includes(normalizarTexto("Nome da criança (se souber)"))) || colunas.some((c) => c.includes("status da negociacao"));
         if (ehPacientes) linhasPacientes.push(...linhas);
         else if (ehProspeccao) linhasProspeccao.push(...linhas);
       }
@@ -902,8 +920,8 @@ function App() {
       if (linhasPacientes.length === 0 && linhasProspeccao.length === 0) {
         const sheetPacAntigo = wb.Sheets["Pacientes"] || wb.Sheets[wb.SheetNames[0]];
         const sheetProAntigo = wb.Sheets["Ainda não fecharam"];
-        if (sheetPacAntigo) linhasPacientes.push(...XLSXlib.utils.sheet_to_json(sheetPacAntigo, { defval: "" }));
-        if (sheetProAntigo) linhasProspeccao.push(...XLSXlib.utils.sheet_to_json(sheetProAntigo, { defval: "" }));
+        if (sheetPacAntigo) linhasPacientes.push(...XLSXlib.utils.sheet_to_json(sheetPacAntigo, { defval: "" }).map(normalizarLinha));
+        if (sheetProAntigo) linhasProspeccao.push(...XLSXlib.utils.sheet_to_json(sheetProAntigo, { defval: "" }).map(normalizarLinha));
       }
 
       const parseIdadeTexto = (texto) => {
@@ -920,23 +938,23 @@ function App() {
       {
         const rows = linhasPacientes;
         rows.forEach((row) => {
-          const nomeRaw = String(row["Nome da criança"] || "").trim();
-          const mae = String(row["Nome da mãe/responsável"] || "").trim();
+          const nomeRaw = String(campo(row, "Nome da criança")).trim();
+          const mae = String(campo(row, "Nome da mãe/responsável")).trim();
           if (!nomeRaw && !mae) return;
           if (nomeRaw.toLowerCase().startsWith("ex:") || mae.toLowerCase().startsWith("ex:")) return;
 
-          const telefoneRaw = row["Contato (WhatsApp)"];
+          const telefoneRaw = campo(row, "Contato (WhatsApp)");
           const telefoneDigits = String(telefoneRaw || "").replace(/\D/g, "");
           const telefone = formatPhoneBR(telefoneRaw);
-          const ultimoContato = excelDateToISO(row["Data da última consulta"]);
-          const proxima = excelDateToISO(row["Próxima consulta prevista"]);
-          const freq = row["Frequência de retorno (dias)"];
-          const statusAgendamento = String(row["Status do agendamento"] || "").trim();
-          const obs = String(row["Observações"] || "").trim();
-          const dataNascimento = parseIdadeTexto(row["Idade atualizada"]) || parseIdadeTexto(row["Idade"]) || "";
+          const ultimoContato = excelDateToISO(campo(row, "Data da última consulta"));
+          const proxima = excelDateToISO(campo(row, "Próxima consulta prevista"));
+          const freq = campo(row, "Frequência de retorno (dias)");
+          const statusAgendamento = String(campo(row, "Status do agendamento")).trim();
+          const obs = String(campo(row, "Observações")).trim();
+          const dataNascimento = parseIdadeTexto(campo(row, "Idade atualizada")) || parseIdadeTexto(campo(row, "Idade")) || "";
           const statusPaciente = /^alta$/i.test(statusAgendamento) ? "concluido" : "ativo";
 
-          let nomes = [nomeRaw];
+          let nomes = [nomeRaw || (mae ? `Filho(a) de ${mae}` : "")];
           const m = nomeRaw.match(/^(.+?)\s+e\s+(.+)$/i);
           if (m && !nomeRaw.includes("(")) nomes = [m[1].trim(), m[2].trim()];
 
@@ -987,19 +1005,19 @@ function App() {
       {
         const rows = linhasProspeccao;
         rows.forEach((row) => {
-          const mae = String(row["Nome da mãe/responsável"] || "").trim();
-          const filhoRaw = String(row["Nome da criança (se souber)"] || "").trim();
+          const mae = String(campo(row, "Nome da mãe/responsável")).trim();
+          const filhoRaw = String(campo(row, "Nome da criança (se souber)")).trim();
           if (mae.toLowerCase().startsWith("ex:") || filhoRaw.toLowerCase().startsWith("ex:")) return;
           if (!mae && !filhoRaw) return;
 
-          const telefoneRaw = row["Contato (WhatsApp)"];
+          const telefoneRaw = campo(row, "Contato (WhatsApp)");
           const telefoneDigits = String(telefoneRaw || "").replace(/\D/g, "");
           if (telefoneDigits && existentesPorTelefone[telefoneDigits]) return;
 
           const telefone = formatPhoneBR(telefoneRaw);
-          const ultimo = excelDateToISO(row["Data do último contato"]);
-          const statusNeg = String(row["Status da negociação"] || "").trim();
-          const obs = String(row["Observações (o que foi conversado / objeção)"] || row["Observações"] || "").trim();
+          const ultimo = excelDateToISO(campo(row, "Data do último contato"));
+          const statusNeg = String(campo(row, "Status da negociação")).trim();
+          const obs = String(campo(row, "Observações (o que foi conversado / objeção)", "Observações")).trim();
 
           let idadeAnos = null;
           let filhoBase = filhoRaw;
