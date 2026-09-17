@@ -780,6 +780,27 @@ function App() {
   }, [googleClientId, contratosModelo, loaded]);
 
   useEffect(() => {
+    if (!loaded) return;
+    const hoje = new Date().toISOString().slice(0, 10);
+    patients.forEach((p) => {
+      if (p.status !== "prospect") return;
+      const dias = diasDesde(p.ultimoContato);
+      if (dias === null || dias < 30) return;
+      const jaTem = followups.some((f) => f.pacienteId === p.id && f.coluna !== "concluido" && f.tipo === "Reativação de prospecção");
+      if (jaTem) return;
+      addFollowup({
+        pacienteId: p.id,
+        titulo: `Reativação — ${p.nome}`,
+        tipo: "Reativação de prospecção",
+        prioridade: "media",
+        prazo: hoje,
+        coluna: "afazer",
+        responsavel: "Nutricionista"
+      });
+    });
+  }, [loaded, patients]);
+
+  useEffect(() => {
     if (!googleClientId) return;
     if (window.google?.accounts?.oauth2) { setGisReady(true); return; }
     if (document.getElementById("gsi-client-script")) return;
@@ -3326,51 +3347,89 @@ function EventModal({ patients, event, onClose, onSave }) {
 
 function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarProspeccao }) {
   const [showModal, setShowModal] = useState(false);
-  const patientName = (id) => patients.find((p) => p.id === id)?.nome || "—";
+  const patientOf = (id) => patients.find((p) => p.id === id);
+  const patientName = (id) => patientOf(id)?.nome || "—";
+  const mensagemReativacao = (p) =>
+    `Oiê ${p?.responsavel || ""}! Passando para saber se ainda tem interesse em agendar aquela conversa sobre a alimentação da ${p?.nome || ""}. Continuo à disposição quando quiser retomar! 💛`;
+
   return (
     <div>
-      <SectionTitle title="Follow-up" subtitle="Tarefas de relacionamento e cobrança"
+      <SectionTitle
+        title="Follow-up"
+        subtitle="Tarefas de relacionamento e cobrança"
         action={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button style={styles.secondaryBtn} onClick={onCriarProspeccao}><Clock size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Follow-up p/ prospecções (1 semana)</button>
-            <button style={styles.primaryBtn} onClick={() => setShowModal(true)}><Plus size={16} /> Novo follow-up</button>
+            <button style={styles.secondaryBtn} onClick={onCriarProspeccao}>
+              <Clock size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Follow-up p/ prospecções (1 semana)
+            </button>
+            <button style={styles.primaryBtn} onClick={() => setShowModal(true)}>
+              <Plus size={16} /> Novo follow-up
+            </button>
           </div>
-        } />
+        }
+      />
       <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 8 }}>
         {KANBAN_COLS.map((col) => {
           const items = followups.filter((f) => f.coluna === col.id);
           return (
             <div key={col.id} style={styles.kanbanCol} className="kanban-col">
-              <div style={styles.kanbanColHeader}>{col.label} <span style={{ color: "#9C9284", fontWeight: 400 }}>({items.length})</span></div>
+              <div style={styles.kanbanColHeader}>
+                {col.label} <span style={{ color: "#9C9284", fontWeight: 400 }}>({items.length})</span>
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {items.map((f) => (
-                  <div key={f.id} style={styles.kanbanCard}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#867A6E" }}>{f.titulo}</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ width: 8, height: 8, borderRadius: 8, background: PRIORIDADE_COLOR[f.prioridade], marginTop: 4 }} />
-                        <button title="Excluir follow-up"
-                          onClick={() => { if (window.confirm("Excluir este follow-up? Essa ação não pode ser desfeita.")) onDelete(f.id); }}
-                          style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", padding: 0, display: "flex" }}>
-                          <Trash2 size={13} />
-                        </button>
+                {items.map((f) => {
+                  const paciente = patientOf(f.pacienteId);
+                  const linkWpp = paciente ? linkWhatsApp(paciente.whatsapp || paciente.telefone, f.mensagemSugerida || mensagemReativacao(paciente)) : null;
+                  return (
+                    <div key={f.id} style={styles.kanbanCard}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#867A6E" }}>{f.titulo}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: 8, background: PRIORIDADE_COLOR[f.prioridade], marginTop: 4 }} />
+                          <button
+                            title="Excluir follow-up"
+                            onClick={() => { if (window.confirm("Excluir este follow-up? Essa ação não pode ser desfeita.")) onDelete(f.id); }}
+                            style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", padding: 0, display: "flex" }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
+                      <div style={{ fontSize: 12, color: "#9C9284", marginTop: 4 }}>{patientName(f.pacienteId)}</div>
+                      <div style={{ fontSize: 11, color: "#9C9284", marginTop: 6 }}>
+                        Prazo {formatData(f.prazo)} · {f.responsavel}
+                      </div>
+                      {linkWpp && (
+                        <a
+                          href={linkWpp} target="_blank" rel="noopener noreferrer"
+                          style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, color: "#918567", fontWeight: 600, textDecoration: "none" }}
+                        >
+                          <MessageCircle size={13} /> Reativar por WhatsApp
+                        </a>
+                      )}
+                      <select
+                        value={f.coluna}
+                        onChange={(e) => onMove(f.id, e.target.value)}
+                        style={styles.kanbanSelect}
+                      >
+                        {KANBAN_COLS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                      </select>
                     </div>
-                    <div style={{ fontSize: 12, color: "#9C9284", marginTop: 4 }}>{patientName(f.pacienteId)}</div>
-                    <div style={{ fontSize: 11, color: "#9C9284", marginTop: 6 }}>Prazo {formatData(f.prazo)} · {f.responsavel}</div>
-                    <select value={f.coluna} onChange={(e) => onMove(f.id, e.target.value)} style={styles.kanbanSelect}>
-                      {KANBAN_COLS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                    </select>
-                  </div>
-                ))}
+                  );
+                })}
                 {items.length === 0 && <div style={{ fontSize: 12, color: "#C9BFAE", padding: "8px 0" }}>Sem tarefas</div>}
               </div>
             </div>
           );
         })}
       </div>
+
       {showModal && (
-        <FollowupModal patients={patients} onClose={() => setShowModal(false)} onSave={(f) => { onAdd(f); setShowModal(false); }} />
+        <FollowupModal
+          patients={patients}
+          onClose={() => setShowModal(false)}
+          onSave={(f) => { onAdd(f); setShowModal(false); }}
+        />
       )}
     </div>
   );
