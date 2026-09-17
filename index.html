@@ -383,16 +383,18 @@ const TIPOS_ACOMPANHAMENTO = [
     ]
   },
   {
-    id: "seletividade",
-    label: "Seletividade Alimentar",
-    faixaEtaria: "1 a 3 anos",
-    duracaoMeses: 4,
-    descricao: "Encontros mensais para a criança recuperar o prazer em comer.",
+    id: "prazer_em_comer",
+    label: "Prazer em Comer",
+    faixaEtaria: "",
+    duracaoMeses: 6,
+    descricao: "Acompanhamento nutricional regular, com retornos mensais para consolidar hábitos alimentares saudáveis.",
     etapas: [
-      { titulo: "Avaliação e plano de ação", descricao: "Levantamento da rotina, histórico e momento de refeição da criança; entrega do plano de ação para a família executar.", offsetMeses: 0 },
-      { titulo: "Acompanhamento do plano de ação", descricao: "Observação do momento de refeição após 1 mês de execução do plano; ajustes de estratégia.", offsetMeses: 1 },
-      { titulo: "Atividade prática 1", descricao: "Atividade prática para aproximar a criança do alimento que ainda não aceita bem.", offsetMeses: 2 },
-      { titulo: "Atividade prática 2", descricao: "Nova atividade prática de aproximação alimentar.", offsetMeses: 3 }
+      { titulo: "Avaliação inicial", descricao: "Levantamento da rotina alimentar e definição dos objetivos do acompanhamento.", offsetMeses: 0 },
+      { titulo: "Retorno mensal 1", descricao: "Acompanhamento da evolução e ajustes de orientação.", offsetMeses: 1 },
+      { titulo: "Retorno mensal 2", descricao: "Acompanhamento da evolução e ajustes de orientação.", offsetMeses: 2 },
+      { titulo: "Retorno mensal 3", descricao: "Acompanhamento da evolução e ajustes de orientação.", offsetMeses: 3 },
+      { titulo: "Retorno mensal 4", descricao: "Acompanhamento da evolução e ajustes de orientação.", offsetMeses: 4 },
+      { titulo: "Retorno mensal 5", descricao: "Acompanhamento da evolução e ajustes de orientação.", offsetMeses: 5 }
     ]
   },
   {
@@ -405,6 +407,19 @@ const TIPOS_ACOMPANHAMENTO = [
       { titulo: "Avaliação inicial (fechamento)", descricao: "Avaliação dos hábitos a trabalhar — é quando a família fecha o acompanhamento.", offsetMeses: 0 },
       { titulo: "Encontro presencial — atividade prática", descricao: "Trabalho do hábito em forma de atividade prática com a criança.", offsetMeses: 0.5 },
       { titulo: "Encontro online — acompanhamento", descricao: "Acompanhamento de como estão as atividades enviadas para casa.", offsetMeses: 1 }
+    ]
+  },
+  {
+    id: "seletividade",
+    label: "Ali(mente)",
+    faixaEtaria: "1 a 3 anos",
+    duracaoMeses: 4,
+    descricao: "Encontros mensais para a criança recuperar uma relação saudável com a comida.",
+    etapas: [
+      { titulo: "Avaliação e plano de ação", descricao: "Levantamento da rotina, histórico e momento de refeição da criança; entrega do plano de ação para a família executar.", offsetMeses: 0 },
+      { titulo: "Acompanhamento do plano de ação", descricao: "Observação do momento de refeição após 1 mês de execução do plano; ajustes de estratégia.", offsetMeses: 1 },
+      { titulo: "Atividade prática 1", descricao: "Atividade prática para aproximar a criança do alimento que ainda não aceita bem.", offsetMeses: 2 },
+      { titulo: "Atividade prática 2", descricao: "Nova atividade prática de aproximação alimentar.", offsetMeses: 3 }
     ]
   },
   {
@@ -462,10 +477,10 @@ const CONTRATOS_PADRAO = {
     "A nutricionista se compromete a oferecer acompanhamento individualizado, orientações baseadas em evidência científica e suporte durante todo o programa.\n\n" +
     "Data: ___/___/______\n\nAssinatura do responsável: _____________________________\nAssinatura da nutricionista: _____________________________",
   seletividade:
-    "TERMO DE COMPROMISSO COM O ACOMPANHAMENTO NUTRICIONAL\nPrograma: Seletividade Alimentar\n\n" +
+    "TERMO DE COMPROMISSO COM O ACOMPANHAMENTO NUTRICIONAL\nPrograma: Ali(mente)\n\n" +
     "Nutricionista: Bárbara Sales — CRN 7168\nPaciente: {{nome}}\nResponsável: {{responsavel}}\n\n" +
     "Este termo formaliza o compromisso do responsável com o acompanhamento nutricional de {{nome}}, " +
-    "voltado à seletividade alimentar, com duração prevista de {{duracao}} meses, início em {{dataInicio}} e término previsto em {{dataFim}}.\n\n" +
+    "voltado à relação da criança com a comida, com duração prevista de {{duracao}} meses, início em {{dataInicio}} e término previsto em {{dataFim}}.\n\n" +
     "Ao assinar, o responsável se compromete a:\n" +
     "1. Comparecer às consultas e atividades práticas agendadas, avisando com antecedência em caso de impossibilidade;\n" +
     "2. Executar em casa o plano de ação combinado, mantendo consistência no momento das refeições;\n" +
@@ -483,6 +498,18 @@ const CONTRATOS_PADRAO = {
     "2. Dar continuidade em casa às atividades combinadas entre um encontro e outro;\n" +
     "3. Manter consistência no processo, entendendo que os resultados dependem do envolvimento ativo da família no dia a dia;\n" +
     "4. Comunicar à nutricionista qualquer dificuldade ou mudança relevante na rotina da criança.\n\n" +
+    "A nutricionista se compromete a oferecer acompanhamento individualizado, orientações baseadas em evidência científica e suporte durante todo o programa.\n\n" +
+    "Data: ___/___/______\n\nAssinatura do responsável: _____________________________\nAssinatura da nutricionista: _____________________________",
+  prazer_em_comer:
+    "TERMO DE COMPROMISSO COM O ACOMPANHAMENTO NUTRICIONAL\nPrograma: Prazer em Comer\n\n" +
+    "Nutricionista: Bárbara Sales — CRN 7168\nPaciente: {{nome}}\nResponsável: {{responsavel}}\n\n" +
+    "Este termo formaliza o compromisso do responsável com o acompanhamento nutricional regular de {{nome}}, " +
+    "com retornos mensais, duração prevista de {{duracao}} meses, início em {{dataInicio}} e término previsto em {{dataFim}}.\n\n" +
+    "Ao assinar, o responsável se compromete a:\n" +
+    "1. Comparecer às consultas mensais agendadas, avisando com antecedência em caso de impossibilidade;\n" +
+    "2. Aplicar em casa as orientações combinadas, mantendo consistência na rotina alimentar da criança;\n" +
+    "3. Manter consistência no processo, entendendo que os resultados dependem do envolvimento ativo da família no dia a dia;\n" +
+    "4. Comunicar à nutricionista qualquer dificuldade ou mudança relevante na rotina alimentar da criança.\n\n" +
     "A nutricionista se compromete a oferecer acompanhamento individualizado, orientações baseadas em evidência científica e suporte durante todo o programa.\n\n" +
     "Data: ___/___/______\n\nAssinatura do responsável: _____________________________\nAssinatura da nutricionista: _____________________________",
   avulso:
@@ -954,13 +981,38 @@ function App() {
           const dataNascimento = parseIdadeTexto(campo(row, "Idade atualizada")) || parseIdadeTexto(campo(row, "Idade")) || "";
           const statusPaciente = /^alta$/i.test(statusAgendamento) ? "concluido" : "ativo";
 
-          // Tenta identificar o tipo de acompanhamento pelo texto das observações,
-          // já que a planilha não tem uma coluna própria pra isso.
+          // Identifica o tipo de acompanhamento na seguinte ordem de confiança:
+          // 1) a coluna "Acompanhamento" da planilha (a mais confiável — vem direto da nutricionista);
+          // 2) a frequência de retorno (mapeamento definido pela nutricionista);
+          // 3) palavras-chave nas observações, como último recurso.
+          const acompanhamentoTexto = String(campo(row, "Acompanhamento")).trim();
+          const mapaAcompanhamento = {
+            "trilhar": "trilhar",
+            "introducao alimentar": "introducao_alimentar",
+            "prazer em comer": "prazer_em_comer",
+            "consulta avulsa": "avulso",
+            "avulso": "avulso",
+            "alimente": "seletividade",
+            "ali(mente)": "seletividade",
+            "seletividade": "seletividade",
+            "seletividade alimentar": "seletividade"
+          };
+          const acompanhamentoChave = normalizarTexto(acompanhamentoTexto);
+          const freqNum = parseInt(freq, 10);
           let tipoIdInferido = "avulso";
-          if (/seletividade/i.test(obs)) tipoIdInferido = "seletividade";
+          if (acompanhamentoChave && mapaAcompanhamento[acompanhamentoChave]) {
+            tipoIdInferido = mapaAcompanhamento[acompanhamentoChave];
+          } else if (freqNum === 7) tipoIdInferido = "seletividade";
+          else if (freqNum === 15) tipoIdInferido = "trilhar";
+          else if (freqNum === 30) tipoIdInferido = "prazer_em_comer";
+          else if (freqNum === 90) tipoIdInferido = "introducao_alimentar";
+          else if (/seletividade|ali\s*\(?mente\)?/i.test(obs)) tipoIdInferido = "seletividade";
           else if (/introdu[cç][aã]o alimentar/i.test(obs)) tipoIdInferido = "introducao_alimentar";
           else if (/trilhar/i.test(obs)) tipoIdInferido = "trilhar";
+          else if (/prazer em comer/i.test(obs)) tipoIdInferido = "prazer_em_comer";
           const tipoInfoInferido = TIPOS_ACOMPANHAMENTO.find((t) => t.id === tipoIdInferido);
+          const acompanhamentoNaoReconhecido =
+            acompanhamentoTexto && acompanhamentoChave && !mapaAcompanhamento[acompanhamentoChave] ? acompanhamentoTexto : null;
 
           let nomes = [nomeRaw || (mae ? `Filho(a) de ${mae}` : "")];
           const m = nomeRaw.match(/^(.+?)\s+e\s+(.+)$/i);
@@ -974,6 +1026,7 @@ function App() {
             else if (/avalia/i.test(statusAgendamento)) tags.push("Avaliação feita");
             if (/unimed|convênio|convenio/i.test(obs)) tags.push("Convênio");
             if (freq) tags.push(`Retorno a cada ${parseInt(freq, 10)}d`);
+            if (acompanhamentoNaoReconhecido) tags.push(acompanhamentoNaoReconhecido);
 
             const existente = existentesPorTelefone[telefoneDigits];
             if (telefoneDigits && existente) {
@@ -1300,7 +1353,7 @@ function App() {
     const confirmar = window.confirm(
       `Isso vai sugerir automaticamente o tipo de acompanhamento para ${elegiveis.length} paciente(s) com idade cadastrada, com base na idade:\n\n` +
       `• Menos de 1 ano → Introdução Alimentar\n` +
-      `• 1 a 3 anos → Seletividade Alimentar\n` +
+      `• 1 a 3 anos → Ali(mente)\n` +
       `• 4 anos ou mais → Trilhar\n\n` +
       `Pacientes que já têm um tipo definido não serão alterados. Confirmar?`
     );
@@ -1495,7 +1548,7 @@ function App() {
         <Header query={query} setQuery={setQuery} onMenuClick={() => setMobileNavOpen(true)} />
         <div style={styles.content} className="content">
           {view === "dashboard" && <Dashboard patients={patients} followups={followups} setView={setView} setSelectedId={setSelectedId} setFiltroPacientesInicial={setFiltroPacientesInicial} />}
-          {view === "patients" && <PatientsList patients={filteredPatients} onOpen={(id) => setSelectedId(id)} onNew={() => setShowNewPatient(true)} onQuickConsulta={registrarConsultaHoje} onExportar={exportarPacientesExcel} onImportar={importarPacientesExcel} filtroInicial={filtroPacientesInicial} />}
+          {view === "patients" && <PatientsList patients={filteredPatients} events={events} onOpen={(id) => setSelectedId(id)} onNew={() => setShowNewPatient(true)} onQuickConsulta={registrarConsultaHoje} onExportar={exportarPacientesExcel} onImportar={importarPacientesExcel} filtroInicial={filtroPacientesInicial} />}
           {view === "agenda" && <Agenda patients={patients} events={events} onAdd={addEvent} onUpdate={updateEvent} onDelete={deleteEvent} />}
           {view === "followups" && <FollowupsBoard followups={followups} patients={patients} onMove={moveFollowup} onAdd={addFollowup} onDelete={deleteFollowup} onCriarProspeccao={criarFollowupsProspeccao} />}
           {view === "financeiro" && <Financeiro patients={patients} onAddPagamento={addPagamento} />}
@@ -1844,9 +1897,10 @@ function SectionTitle({ title, subtitle, action }) {
 /* ---------------------------------------------------------
    Lista de pacientes
 --------------------------------------------------------- */
-function PatientsList({ patients, onOpen, onNew, onQuickConsulta, onExportar, onImportar, filtroInicial }) {
+function PatientsList({ patients, events, onOpen, onNew, onQuickConsulta, onExportar, onImportar, filtroInicial }) {
   const fileInputRef = useRef(null);
   const [filtroStatus, setFiltroStatus] = useState(filtroInicial || "todos");
+  const [ordenacao, setOrdenacao] = useState("nome");
   const [limite, setLimite] = useState(30);
 
   useEffect(() => { setLimite(30); }, [patients.length, filtroStatus]);
@@ -1865,7 +1919,33 @@ function PatientsList({ patients, onOpen, onNew, onQuickConsulta, onExportar, on
     { id: "concluido", label: "Receberam alta" },
     { id: "prospect", label: "Prospecção" }
   ];
-  const filtrados = filtroStatus === "todos" ? patients : patients.filter((p) => p.status === filtroStatus);
+  const filtradosBrutos = filtroStatus === "todos" ? patients : patients.filter((p) => p.status === filtroStatus);
+
+  const proximoAtendimentoPorPaciente = useMemo(() => {
+    const mapa = {};
+    const hoje = new Date().toISOString().slice(0, 10);
+    (events || []).forEach((e) => {
+      if (e.status !== "agendado" || !e.data || e.data < hoje) return;
+      if (!mapa[e.pacienteId] || e.data < mapa[e.pacienteId]) mapa[e.pacienteId] = e.data;
+    });
+    return mapa;
+  }, [events]);
+
+  const filtrados = useMemo(() => {
+    const arr = [...filtradosBrutos];
+    if (ordenacao === "proximo") {
+      arr.sort((a, b) => {
+        const da = proximoAtendimentoPorPaciente[a.id] || "9999-99-99";
+        const db = proximoAtendimentoPorPaciente[b.id] || "9999-99-99";
+        if (da !== db) return da.localeCompare(db);
+        return (a.nome || "").localeCompare(b.nome || "", "pt-BR");
+      });
+    } else {
+      arr.sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
+    }
+    return arr;
+  }, [filtradosBrutos, ordenacao, proximoAtendimentoPorPaciente]);
+
   const visiveis = filtrados.slice(0, limite);
 
   return (
@@ -1898,7 +1978,7 @@ function PatientsList({ patients, onOpen, onNew, onQuickConsulta, onExportar, on
           </div>
         }
       />
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
         {FILTROS.map((f) => (
           <button
             key={f.id}
@@ -1911,6 +1991,26 @@ function PatientsList({ patients, onOpen, onNew, onQuickConsulta, onExportar, on
             }}
           >
             {f.label} ({contagens[f.id]})
+          </button>
+        ))}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        <span style={{ fontSize: 12, color: "#9C9284", fontWeight: 600 }}>Ordenar por:</span>
+        {[
+          { id: "nome", label: "Ordem alfabética" },
+          { id: "proximo", label: "Próximo atendimento" }
+        ].map((o) => (
+          <button
+            key={o.id}
+            onClick={() => setOrdenacao(o.id)}
+            style={{
+              padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
+              border: `1px solid ${ordenacao === o.id ? "#918567" : "#E3DACB"}`,
+              background: ordenacao === o.id ? "#EFE6D8" : "#FFFFFF",
+              color: ordenacao === o.id ? "#867A6E" : "#9C9284"
+            }}
+          >
+            {o.label}
           </button>
         ))}
       </div>
@@ -2002,6 +2102,10 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
   const [idadeAnosEdit, setIdadeAnosEdit] = useState("");
   const [curvaTipo, setCurvaTipo] = useState("peso");
   const [planoAcaoInput, setPlanoAcaoInput] = useState(patient.planoAcao || "");
+  const [editandoAcompanhamento, setEditandoAcompanhamento] = useState(false);
+  const [acompForm, setAcompForm] = useState(null);
+  const [medicaoEditandoIdx, setMedicaoEditandoIdx] = useState(null);
+  const [medicaoEditForm, setMedicaoEditForm] = useState(null);
   const [planoAcaoSalvo, setPlanoAcaoSalvo] = useState(false);
   const [showExameForm, setShowExameForm] = useState(false);
   const [exameForm, setExameForm] = useState({ data: new Date().toISOString().slice(0, 10), nome: "", resultado: "", categoria: "normal" });
@@ -2071,6 +2175,60 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
     onSetPlanoAcao(planoAcaoInput);
     setPlanoAcaoSalvo(true);
     setTimeout(() => setPlanoAcaoSalvo(false), 2000);
+  };
+
+  const iniciarEdicaoAcompanhamento = () => {
+    setAcompForm({
+      dataInicio: patient.acompanhamento?.dataInicio || "",
+      dataFim: patient.acompanhamento?.dataFim || "",
+      proximaConsultaPrevista: patient.proximaConsultaPrevista || "",
+      consultasTotal: patient.acompanhamento?.consultasTotal || 1,
+      consultasRealizadas: patient.acompanhamento?.consultasRealizadas || 0,
+      valor: patient.acompanhamento?.valor || 0,
+      formaPagamento: patient.acompanhamento?.formaPagamento || "Pix",
+      parcelas: patient.acompanhamento?.parcelas || 1
+    });
+    setEditandoAcompanhamento(true);
+  };
+
+  const salvarAcompanhamento = () => {
+    onUpdate({
+      proximaConsultaPrevista: acompForm.proximaConsultaPrevista,
+      acompanhamento: {
+        ...patient.acompanhamento,
+        dataInicio: acompForm.dataInicio,
+        dataFim: acompForm.dataFim,
+        consultasTotal: Number(acompForm.consultasTotal) || 1,
+        consultasRealizadas: Number(acompForm.consultasRealizadas) || 0,
+        valor: Number(acompForm.valor) || 0,
+        formaPagamento: acompForm.formaPagamento,
+        parcelas: Number(acompForm.parcelas) || 1
+      }
+    });
+    setEditandoAcompanhamento(false);
+  };
+
+  const iniciarEdicaoMedicao = (idx, entrada) => {
+    setMedicaoEditForm({ data: entrada.data, peso: entrada.peso, altura: entrada.altura, obs: entrada.obs || "" });
+    setMedicaoEditandoIdx(idx);
+  };
+
+  const salvarEdicaoMedicao = () => {
+    const nova = [...(patient.evolucao || [])];
+    nova[medicaoEditandoIdx] = {
+      data: medicaoEditForm.data,
+      peso: Number(medicaoEditForm.peso),
+      altura: Number(medicaoEditForm.altura),
+      obs: medicaoEditForm.obs
+    };
+    onUpdate({ evolucao: nova });
+    setMedicaoEditandoIdx(null);
+  };
+
+  const excluirMedicao = (idx) => {
+    if (!window.confirm("Excluir esta medição?")) return;
+    const nova = (patient.evolucao || []).filter((_, i) => i !== idx);
+    onUpdate({ evolucao: nova });
   };
 
   const salvarExame = () => {
@@ -2525,15 +2683,42 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                 </>
               )}
               <div style={{ marginTop: 12 }}>
-                {(patient.evolucao || []).slice().reverse().map((e, i) => (
-                  <div key={i} style={styles.evoRow} className="evo-row">
-                    <div style={{ fontSize: 12, color: "#9C9284", width: 90 }}>{formatData(e.data)}</div>
-                    <div style={{ fontSize: 13, color: "#867A6E", width: 70 }}>{e.peso} kg</div>
-                    <div style={{ fontSize: 13, color: "#867A6E", width: 70 }}>{e.altura} cm</div>
-                    <div style={{ fontSize: 13, color: "#867A6E", width: 70 }}>IMC {calcIMC(e.peso, e.altura)}</div>
-                    <div style={{ fontSize: 13, color: "#6E6355", flex: 1 }}>{e.obs}</div>
-                  </div>
-                ))}
+                {(patient.evolucao || []).slice().reverse().map((e, i) => {
+                  const idxOriginal = (patient.evolucao || []).length - 1 - i;
+                  if (medicaoEditandoIdx === idxOriginal) {
+                    return (
+                      <div key={idxOriginal} style={{ ...styles.panel, marginBottom: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                          <Field label="Data" type="date" value={medicaoEditForm.data} onChange={(v) => setMedicaoEditForm((f) => ({ ...f, data: v }))} />
+                          <Field label="Peso (kg)" type="number" value={medicaoEditForm.peso} onChange={(v) => setMedicaoEditForm((f) => ({ ...f, peso: v }))} />
+                          <Field label="Altura (cm)" type="number" value={medicaoEditForm.altura} onChange={(v) => setMedicaoEditForm((f) => ({ ...f, altura: v }))} />
+                        </div>
+                        <Field label="Observação" value={medicaoEditForm.obs} onChange={(v) => setMedicaoEditForm((f) => ({ ...f, obs: v }))} full />
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+                          <button style={styles.secondaryBtn} onClick={() => setMedicaoEditandoIdx(null)}>Cancelar</button>
+                          <button style={styles.primaryBtn} onClick={salvarEdicaoMedicao}>Salvar</button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={idxOriginal} style={styles.evoRow} className="evo-row">
+                      <div style={{ fontSize: 12, color: "#9C9284", width: 90 }}>{formatData(e.data)}</div>
+                      <div style={{ fontSize: 13, color: "#867A6E", width: 70 }}>{e.peso} kg</div>
+                      <div style={{ fontSize: 13, color: "#867A6E", width: 70 }}>{e.altura} cm</div>
+                      <div style={{ fontSize: 13, color: "#867A6E", width: 70 }}>IMC {calcIMC(e.peso, e.altura)}</div>
+                      <div style={{ fontSize: 13, color: "#6E6355", flex: 1 }}>{e.obs}</div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button title="Editar medição" onClick={() => iniciarEdicaoMedicao(idxOriginal, e)} style={{ background: "none", border: "none", color: "#9C9284", cursor: "pointer", display: "flex", padding: 0 }}>
+                          <Pencil size={13} />
+                        </button>
+                        <button title="Excluir medição" onClick={() => excluirMedicao(idxOriginal)} style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", display: "flex", padding: 0 }}>
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -2695,14 +2880,42 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                 </select>
                 <div style={{ fontSize: 12, color: "#9C9284", marginTop: 6 }}>{tipoInfo.descricao}</div>
               </div>
-              <InfoGrid items={[
-                ["Tipo de plano", patient.acompanhamento.tipo],
-                ["Início", formatData(patient.acompanhamento.dataInicio)],
-                ["Fim previsto", formatData(patient.acompanhamento.dataFim)],
-                ["Consultas", `${patient.acompanhamento.consultasRealizadas} de ${patient.acompanhamento.consultasTotal}`],
-                ["Valor total", formatMoeda(patient.acompanhamento.valor)],
-                ["Forma de pagamento", `${patient.acompanhamento.formaPagamento} · ${patient.acompanhamento.parcelas}x`]
-              ]} />
+              {!editandoAcompanhamento ? (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <div style={{ fontSize: 11, color: "#9C9284", textTransform: "uppercase", letterSpacing: 0.4 }}>Detalhes do plano</div>
+                    <button title="Editar detalhes" style={{ background: "none", border: "none", color: "#867A6E", cursor: "pointer", display: "flex", padding: 0 }} onClick={iniciarEdicaoAcompanhamento}>
+                      <Pencil size={14} />
+                    </button>
+                  </div>
+                  <InfoGrid items={[
+                    ["Tipo de plano", patient.acompanhamento.tipo],
+                    ["Início", formatData(patient.acompanhamento.dataInicio)],
+                    ["Fim previsto", formatData(patient.acompanhamento.dataFim)],
+                    ["Próxima consulta prevista", formatData(patient.proximaConsultaPrevista)],
+                    ["Consultas", `${patient.acompanhamento.consultasRealizadas} de ${patient.acompanhamento.consultasTotal}`],
+                    ["Valor total", formatMoeda(patient.acompanhamento.valor)],
+                    ["Forma de pagamento", `${patient.acompanhamento.formaPagamento} · ${patient.acompanhamento.parcelas}x`]
+                  ]} />
+                </>
+              ) : (
+                <div style={styles.panel}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <Field label="Início do acompanhamento" type="date" value={acompForm.dataInicio} onChange={(v) => setAcompForm((f) => ({ ...f, dataInicio: v }))} />
+                    <Field label="Fim previsto" type="date" value={acompForm.dataFim} onChange={(v) => setAcompForm((f) => ({ ...f, dataFim: v }))} />
+                    <Field label="Próxima consulta prevista" type="date" value={acompForm.proximaConsultaPrevista} onChange={(v) => setAcompForm((f) => ({ ...f, proximaConsultaPrevista: v }))} />
+                    <Field label="Consultas realizadas" type="number" value={acompForm.consultasRealizadas} onChange={(v) => setAcompForm((f) => ({ ...f, consultasRealizadas: v }))} />
+                    <Field label="Consultas total" type="number" value={acompForm.consultasTotal} onChange={(v) => setAcompForm((f) => ({ ...f, consultasTotal: v }))} />
+                    <Field label="Valor total (R$)" type="number" value={acompForm.valor} onChange={(v) => setAcompForm((f) => ({ ...f, valor: v }))} />
+                    <Field label="Forma de pagamento" value={acompForm.formaPagamento} onChange={(v) => setAcompForm((f) => ({ ...f, formaPagamento: v }))} />
+                    <Field label="Parcelas" type="number" value={acompForm.parcelas} onChange={(v) => setAcompForm((f) => ({ ...f, parcelas: v }))} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+                    <button style={styles.secondaryBtn} onClick={() => setEditandoAcompanhamento(false)}>Cancelar</button>
+                    <button style={styles.primaryBtn} onClick={salvarAcompanhamento}>Salvar</button>
+                  </div>
+                </div>
+              )}
               <div style={styles.divider} />
               <div style={styles.miniTitle}>Status do acompanhamento</div>
               <StatusPill status={patient.status} />
@@ -2746,6 +2959,7 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
     </>
   );
 }
+
 
 function InfoGrid({ items }) {
   return (
@@ -3448,7 +3662,7 @@ function Integracoes({
       <div style={styles.panel}>
         <div style={styles.panelTitle}>Classificação em massa</div>
         <div style={{ fontSize: 13, color: "#4B615D", lineHeight: 1.7, marginBottom: 12 }}>
-          Sugere automaticamente o tipo de acompanhamento (Introdução Alimentar, Seletividade Alimentar ou Trilhar)
+          Sugere automaticamente o tipo de acompanhamento (Introdução Alimentar, Ali(mente) ou Trilhar)
           para pacientes que já têm data de nascimento preenchida e ainda não têm um tipo definido, com base na idade.
           Pacientes já classificados não são alterados.
         </div>
