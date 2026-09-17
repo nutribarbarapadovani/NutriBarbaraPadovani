@@ -3347,10 +3347,18 @@ function EventModal({ patients, event, onClose, onSave }) {
 
 function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarProspeccao }) {
   const [showModal, setShowModal] = useState(false);
+  const [aba, setAba] = useState("atrasadas");
   const patientOf = (id) => patients.find((p) => p.id === id);
   const patientName = (id) => patientOf(id)?.nome || "—";
   const mensagemReativacao = (p) =>
     `Oiê ${p?.responsavel || ""}! Passando para saber se ainda tem interesse em agendar aquela conversa sobre a alimentação da ${p?.nome || ""}. Continuo à disposição quando quiser retomar! 💛`;
+
+  const contagemProspeccao = followups.filter((f) => patientOf(f.pacienteId)?.status === "prospect").length;
+  const contagemAtrasadas = followups.length - contagemProspeccao;
+  const followupsFiltrados = followups.filter((f) => {
+    const ehProspeccao = patientOf(f.pacienteId)?.status === "prospect";
+    return aba === "prospeccao" ? ehProspeccao : !ehProspeccao;
+  });
 
   return (
     <div>
@@ -3368,9 +3376,28 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
           </div>
         }
       />
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {[
+          { id: "atrasadas", label: "Consultas atrasadas", count: contagemAtrasadas },
+          { id: "prospeccao", label: "Prospecção", count: contagemProspeccao }
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setAba(t.id)}
+            style={{
+              padding: "8px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer",
+              border: `1px solid ${aba === t.id ? "#867A6E" : "#E3DACB"}`,
+              background: aba === t.id ? "#867A6E" : "#FFFFFF",
+              color: aba === t.id ? "#FFFFFF" : "#6E6355"
+            }}
+          >
+            {t.label} ({t.count})
+          </button>
+        ))}
+      </div>
       <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 8 }}>
         {KANBAN_COLS.map((col) => {
-          const items = followups.filter((f) => f.coluna === col.id);
+          const items = followupsFiltrados.filter((f) => f.coluna === col.id);
           return (
             <div key={col.id} style={styles.kanbanCol} className="kanban-col">
               <div style={styles.kanbanColHeader}>
