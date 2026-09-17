@@ -1701,6 +1701,7 @@ function Header({ query, setQuery, onMenuClick }) {
    Dashboard
 --------------------------------------------------------- */
 function Dashboard({ patients, followups, setView, setSelectedId, setFiltroPacientesInicial }) {
+  const [ordenacaoSemContato, setOrdenacaoSemContato] = useState("dias");
   const ativos = patients.filter((p) => p.status === "ativo").length;
   const pausa = patients.filter((p) => p.status === "pausa").length;
   const concluidos = patients.filter((p) => p.status === "concluido").length;
@@ -1847,21 +1848,50 @@ function Dashboard({ patients, followups, setView, setSelectedId, setFiltroPacie
       </div>
 
       <div style={styles.panel}>
-        <div style={styles.panelTitle}>Pacientes sem contato há 21+ dias</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+          <div style={styles.panelTitle}>Pacientes sem contato há 21+ dias</div>
+          {semContato.length > 0 && (
+            <div style={{ display: "flex", gap: 6 }}>
+              {[
+                { id: "dias", label: "Mais tempo sem contato" },
+                { id: "nome", label: "Ordem alfabética" }
+              ].map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() => setOrdenacaoSemContato(o.id)}
+                  style={{
+                    padding: "4px 10px", borderRadius: 20, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
+                    border: `1px solid ${ordenacaoSemContato === o.id ? "#918567" : "#E3DACB"}`,
+                    background: ordenacaoSemContato === o.id ? "#EFE6D8" : "#FFFFFF",
+                    color: ordenacaoSemContato === o.id ? "#867A6E" : "#9C9284"
+                  }}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {semContato.length === 0 ? (
           <div style={styles.emptyRow}>Nenhum paciente ativo nessa situação. Tudo em dia.</div>
         ) : (
-          semContato.map((p) => (
-            <div key={p.id} style={styles.riskRow} onClick={() => setSelectedId(p.id)}>
-              <div>
-                <div style={{ fontWeight: 600, color: "#867A6E" }}>{p.nome}</div>
-                <div style={{ fontSize: 12, color: "#9C9284" }}>{p.diagnostico}</div>
+          [...semContato]
+            .sort((a, b) =>
+              ordenacaoSemContato === "nome"
+                ? (a.nome || "").localeCompare(b.nome || "", "pt-BR")
+                : diasDesde(b.ultimoContato) - diasDesde(a.ultimoContato)
+            )
+            .map((p) => (
+              <div key={p.id} style={styles.riskRow} onClick={() => setSelectedId(p.id)}>
+                <div>
+                  <div style={{ fontWeight: 600, color: "#867A6E" }}>{p.nome}</div>
+                  <div style={{ fontSize: 12, color: "#9C9284" }}>{p.diagnostico}</div>
+                </div>
+                <div style={{ fontSize: 12, color: "#A99790", fontWeight: 600 }}>
+                  {diasDesde(p.ultimoContato)} dias sem contato
+                </div>
               </div>
-              <div style={{ fontSize: 12, color: "#A99790", fontWeight: 600 }}>
-                {diasDesde(p.ultimoContato)} dias sem contato
-              </div>
-            </div>
-          ))
+            ))
         )}
       </div>
     </div>
@@ -3131,20 +3161,53 @@ function Field({ label, value, onChange, type = "text", options, full, error }) 
 function Agenda({ patients, events, onAdd, onUpdate, onDelete }) {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [ordenacaoAgenda, setOrdenacaoAgenda] = useState("horario");
+
   const patientName = (id) => patients.find((p) => p.id === id)?.nome || "—";
 
   const ordenados = [...events].sort((a, b) => (a.data + (a.hora || "")).localeCompare(b.data + (b.hora || "")));
-  const porData = ordenados.reduce((acc, e) => { acc[e.data] = acc[e.data] || []; acc[e.data].push(e); return acc; }, {});
+  const porData = ordenados.reduce((acc, e) => {
+    acc[e.data] = acc[e.data] || [];
+    acc[e.data].push(e);
+    return acc;
+  }, {});
+  if (ordenacaoAgenda === "nome") {
+    Object.keys(porData).forEach((data) => {
+      porData[data].sort((a, b) => patientName(a.pacienteId).localeCompare(patientName(b.pacienteId), "pt-BR"));
+    });
+  }
 
   return (
     <div>
-      <SectionTitle title="Agenda" subtitle="Consultas e retornos por data"
+      <SectionTitle
+        title="Agenda"
+        subtitle="Consultas e retornos por data"
         action={
           <button style={styles.primaryBtn} onClick={() => { setEditing(null); setShowModal(true); }}>
             <Plus size={16} /> Novo agendamento
           </button>
         }
       />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <span style={{ fontSize: 12, color: "#9C9284", fontWeight: 600 }}>Ordenar por:</span>
+        {[
+          { id: "horario", label: "Horário" },
+          { id: "nome", label: "Ordem alfabética" }
+        ].map((o) => (
+          <button
+            key={o.id}
+            onClick={() => setOrdenacaoAgenda(o.id)}
+            style={{
+              padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
+              border: `1px solid ${ordenacaoAgenda === o.id ? "#918567" : "#E3DACB"}`,
+              background: ordenacaoAgenda === o.id ? "#EFE6D8" : "#FFFFFF",
+              color: ordenacaoAgenda === o.id ? "#867A6E" : "#9C9284"
+            }}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
       <div style={styles.panel}>
         {Object.keys(porData).length === 0 && <div style={styles.emptyRow}>Nenhum evento agendado.</div>}
         {Object.entries(porData).map(([data, lista]) => (
@@ -3154,27 +3217,44 @@ function Agenda({ patients, events, onAdd, onUpdate, onDelete }) {
             </div>
             {lista.map((e) => (
               <div key={e.id} style={styles.agendaRow} className="agenda-row">
-                <CalendarIcon size={15} color={EVENT_STATUS_COLOR[e.status]} />
+                <Calendar size={15} color={EVENT_STATUS_COLOR[e.status]} />
                 <div className="agenda-name" style={{ fontWeight: 600, color: "#867A6E", width: 180 }}>
-                  {patientName(e.pacienteId)}{e.hora && <span style={{ color: "#9C9284", fontWeight: 400 }}> · {e.hora}</span>}
+                  {patientName(e.pacienteId)}
+                  {e.hora && <span style={{ color: "#9C9284", fontWeight: 400 }}> · {e.hora}</span>}
                 </div>
                 <div style={{ fontSize: 13, color: "#6E6355" }}>{e.tipo}</div>
-                <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20, background: EVENT_STATUS_COLOR[e.status] + "1F", color: EVENT_STATUS_COLOR[e.status] }}>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20,
+                  background: EVENT_STATUS_COLOR[e.status] + "1F", color: EVENT_STATUS_COLOR[e.status]
+                }}>
                   {EVENT_STATUS_LABEL[e.status]}
                 </span>
                 <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
                   {e.status === "agendado" && (
-                    <button title="Marcar como realizado" onClick={() => { if (window.confirm(`Confirmar que a consulta de ${patientName(e.pacienteId)} foi realizada?`)) onUpdate(e.id, { status: "realizado" }); }}
-                      style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#918567", cursor: "pointer" }}>
+                    <button
+                      title="Marcar como realizado"
+                      onClick={() => {
+                        if (window.confirm(`Confirmar que a consulta de ${patientName(e.pacienteId)} foi realizada?`)) {
+                          onUpdate(e.id, { status: "realizado" });
+                        }
+                      }}
+                      style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#918567", cursor: "pointer" }}
+                    >
                       <CheckCircle2 size={13} />
                     </button>
                   )}
-                  <button title="Editar" onClick={() => { setEditing(e); setShowModal(true); }}
-                    style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#6E6355", cursor: "pointer" }}>
+                  <button
+                    title="Editar"
+                    onClick={() => { setEditing(e); setShowModal(true); }}
+                    style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#6E6355", cursor: "pointer" }}
+                  >
                     <Pencil size={13} />
                   </button>
-                  <button title="Excluir" onClick={() => { if (window.confirm("Excluir este agendamento? Essa ação não pode ser desfeita.")) onDelete(e.id); }}
-                    style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#A99790", cursor: "pointer" }}>
+                  <button
+                    title="Excluir"
+                    onClick={() => { if (window.confirm("Excluir este agendamento? Essa ação não pode ser desfeita.")) onDelete(e.id); }}
+                    style={{ background: "#EFE6D8", border: "none", borderRadius: 6, padding: 5, display: "flex", color: "#A99790", cursor: "pointer" }}
+                  >
                     <Trash2 size={13} />
                   </button>
                 </div>
@@ -3183,12 +3263,17 @@ function Agenda({ patients, events, onAdd, onUpdate, onDelete }) {
           </div>
         ))}
       </div>
+
       {showModal && (
         <EventModal
           patients={patients}
           event={editing}
           onClose={() => setShowModal(false)}
-          onSave={(ev) => { if (editing) onUpdate(editing.id, ev); else onAdd(ev); setShowModal(false); }}
+          onSave={(ev) => {
+            if (editing) onUpdate(editing.id, ev);
+            else onAdd(ev);
+            setShowModal(false);
+          }}
         />
       )}
     </div>
