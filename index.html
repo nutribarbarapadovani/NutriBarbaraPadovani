@@ -801,6 +801,28 @@ function App() {
   }, [loaded, patients]);
 
   useEffect(() => {
+    if (!loaded) return;
+    const hoje = new Date().toISOString().slice(0, 10);
+    patients.forEach((p) => {
+      if (p.status !== "ativo") return;
+      if (!p.proximaConsultaPrevista) return;
+      const diasAtraso = diasDesde(p.proximaConsultaPrevista);
+      if (diasAtraso === null || diasAtraso < 7) return;
+      const jaTem = followups.some((f) => f.pacienteId === p.id && f.coluna !== "concluido" && f.tipo === "Consulta atrasada");
+      if (jaTem) return;
+      addFollowup({
+        pacienteId: p.id,
+        titulo: `Consulta atrasada — ${p.nome}`,
+        tipo: "Consulta atrasada",
+        prioridade: "alta",
+        prazo: hoje,
+        coluna: "afazer",
+        responsavel: "Nutricionista"
+      });
+    });
+  }, [loaded, patients]);
+
+  useEffect(() => {
     if (!googleClientId) return;
     if (window.google?.accounts?.oauth2) { setGisReady(true); return; }
     if (document.getElementById("gsi-client-script")) return;
@@ -3352,6 +3374,9 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
   const patientName = (id) => patientOf(id)?.nome || "—";
   const mensagemReativacao = (p) =>
     `Oiê ${p?.responsavel || ""}! Passando para saber se ainda tem interesse em agendar aquela conversa sobre a alimentação da ${p?.nome || ""}. Continuo à disposição quando quiser retomar! 💛`;
+  const mensagemConsultaAtrasada = (p) =>
+    `Oiê ${p?.responsavel || ""}! Passando para saber se conseguiu pensar em um horário para o retorno da ${p?.nome || ""}. Qualquer horário, me avisa! 💛`;
+  const mensagemPara = (f, p) => (f.tipo === "Consulta atrasada" ? mensagemConsultaAtrasada(p) : mensagemReativacao(p));
 
   const contagemProspeccao = followups.filter((f) => patientOf(f.pacienteId)?.status === "prospect").length;
   const contagemAtrasadas = followups.length - contagemProspeccao;
@@ -3406,7 +3431,7 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {items.map((f) => {
                   const paciente = patientOf(f.pacienteId);
-                  const linkWpp = paciente ? linkWhatsApp(paciente.whatsapp || paciente.telefone, f.mensagemSugerida || mensagemReativacao(paciente)) : null;
+                  const linkWpp = paciente ? linkWhatsApp(paciente.whatsapp || paciente.telefone, f.mensagemSugerida || mensagemPara(f, paciente)) : null;
                   return (
                     <div key={f.id} style={styles.kanbanCard}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -3431,7 +3456,7 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
                           href={linkWpp} target="_blank" rel="noopener noreferrer"
                           style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, color: "#918567", fontWeight: 600, textDecoration: "none" }}
                         >
-                          <MessageCircle size={13} /> Reativar por WhatsApp
+                          <MessageCircle size={13} /> {f.tipo === "Consulta atrasada" ? "Cobrar retorno por WhatsApp" : "Reativar por WhatsApp"}
                         </a>
                       )}
                       <select
