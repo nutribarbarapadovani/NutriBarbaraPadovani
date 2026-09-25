@@ -433,6 +433,95 @@ const TIPOS_ACOMPANHAMENTO = [
 ];
 const DURACAO_MINIMA_MESES = 1;
 
+/* Programas que existem de fato no app Afeto à Mesa (espelham TIPOS_ACOMPANHAMENTO, exceto "avulso") */
+const APP_PROGRAMAS = TIPOS_ACOMPANHAMENTO.filter((t) => t.id !== "avulso");
+
+const gerarCodigoConvite = (nome) => {
+  const iniciais = (nome || "").trim().split(/\s+/).slice(0, 1)[0]?.slice(0, 3).toUpperCase() || "APP";
+  const numero = Math.floor(1000 + Math.random() * 9000);
+  return `${iniciais}-${numero}`;
+};
+
+function appInviteToRow(inv) {
+  return {
+    id: inv.id,
+    paciente_id: inv.pacienteId,
+    code: inv.code,
+    programas: inv.programas || [],
+    status: inv.status || "gerado",
+    telefone_destino: inv.telefoneDestino || "",
+    expires_at: inv.expiresAt || null,
+    created_at: inv.createdAt || new Date().toISOString(),
+    used_at: inv.usedAt || null
+  };
+}
+function appInviteFromRow(r) {
+  return {
+    id: r.id,
+    pacienteId: r.paciente_id,
+    code: r.code,
+    programas: r.programas || [],
+    status: r.status || "gerado",
+    telefoneDestino: r.telefone_destino || "",
+    expiresAt: r.expires_at || "",
+    createdAt: r.created_at || "",
+    usedAt: r.used_at || ""
+  };
+}
+
+/* ---------------------------------------------------------
+   Conteúdo do app (cortes, guias, receitas, cardápios, rotinas,
+   atividades, lancheira, impressos, complementares)
+--------------------------------------------------------- */
+const CONTEUDO_TIPOS = [
+  { id: "corte", label: "Cortes" },
+  { id: "guia", label: "Guias" },
+  { id: "receita", label: "Receitas" },
+  { id: "cardapio", label: "Cardápios" },
+  { id: "rotina", label: "Rotinas" },
+  { id: "atividade", label: "Atividades" },
+  { id: "lancheira", label: "Lancheira" },
+  { id: "impresso", label: "Impressos" },
+  { id: "complementar", label: "Complementares" }
+];
+const CONTEUDO_STATUS = {
+  aguardando: { label: "Aguardando material", color: "#867A6E", bg: "#EFE6D8" },
+  rascunho: { label: "Rascunho", color: "#867A6E", bg: "#EFE6D8" },
+  revisao: { label: "Em revisão", color: "#B4863F", bg: "#F3E3C7" },
+  publicado: { label: "Publicado", color: "#3D5A40", bg: "#DCE8D8" }
+};
+const DIAS_SEMANA_CARDAPIO = [
+  { id: "seg", label: "Segunda" }, { id: "ter", label: "Terça" }, { id: "qua", label: "Quarta" },
+  { id: "qui", label: "Quinta" }, { id: "sex", label: "Sexta" }, { id: "sab", label: "Sábado" }, { id: "dom", label: "Domingo" }
+];
+const REFEICOES_CARDAPIO = [
+  { id: "cafe", label: "Café da manhã" }, { id: "almoco", label: "Almoço" },
+  { id: "lanche", label: "Lanche" }, { id: "jantar", label: "Jantar" }
+];
+const cardapioVazio = () => ({
+  publicado: false, observacoes: "", atualizadoEm: "",
+  grade: DIAS_SEMANA_CARDAPIO.reduce((acc, d) => {
+    acc[d.id] = REFEICOES_CARDAPIO.reduce((r, ref) => { r[ref.id] = ""; return r; }, {});
+    return acc;
+  }, {})
+});
+function contentToRow(c) {
+  return {
+    id: c.id, tipo: c.tipo, titulo: c.titulo || "", fase: c.fase || null,
+    nivel_minimo: c.nivelMinimo || "gratuito", status: c.status || "aguardando",
+    corpo: c.corpo || "", fontes: c.fontes || "", versoes: c.versoes || [],
+    created_at: c.createdAt || new Date().toISOString(), updated_at: new Date().toISOString()
+  };
+}
+function contentFromRow(r) {
+  return {
+    id: r.id, tipo: r.tipo, titulo: r.titulo || "", fase: r.fase || "",
+    nivelMinimo: r.nivel_minimo || "gratuito", status: r.status || "aguardando",
+    corpo: r.corpo || "", fontes: r.fontes || "", versoes: r.versoes || [],
+    createdAt: r.created_at || "", updatedAt: r.updated_at || ""
+  };
+}
+
 const seedFollowups = () => IMPORTED_FOLLOWUPS;
 
 
@@ -653,7 +742,8 @@ function patientToRow(p) {
     sessoes: p.sessoes || [],
     exames: p.exames || [],
     marcos_alimentares: p.marcosAlimentares || [],
-    timeline: p.timeline || []
+    timeline: p.timeline || [],
+    app: p.app || { status: "inativo", programas: [] }
   };
 }
 function patientFromRow(r) {
@@ -687,7 +777,8 @@ function patientFromRow(r) {
     sessoes: r.sessoes || [],
     exames: r.exames || [],
     marcosAlimentares: r.marcos_alimentares || [],
-    timeline: r.timeline || []
+    timeline: r.timeline || [],
+    app: r.app || { status: "inativo", programas: [] }
   };
 }
 function eventToRow(e) {
@@ -733,6 +824,8 @@ function App() {
   const [showNewPatient, setShowNewPatient] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [events, setEvents] = useState([]);
+  const [appInvites, setAppInvites] = useState([]);
+  const [contentItems, setContentItems] = useState([]);
 
   useEffect(() => {
     if (query.trim() && view !== "patients") {
@@ -751,15 +844,19 @@ function App() {
   useEffect(() => {
     (async () => {
       try {
-        const [pacientesRes, eventosRes, followupsRes, settingsRes] = await Promise.all([
+        const [pacientesRes, eventosRes, followupsRes, settingsRes, appInvitesRes, appContentRes] = await Promise.all([
           supabaseClient.from("patients").select("*"),
           supabaseClient.from("events").select("*"),
           supabaseClient.from("followups").select("*"),
-          supabaseClient.from("app_settings").select("*")
+          supabaseClient.from("app_settings").select("*"),
+          supabaseClient.from("app_invites").select("*"),
+          supabaseClient.from("app_content").select("*")
         ]);
         setPatients((pacientesRes.data || []).map(patientFromRow));
         setEvents((eventosRes.data || []).map(eventFromRow));
         setFollowups((followupsRes.data || []).map(followupFromRow));
+        setAppInvites((appInvitesRes.data || []).map(appInviteFromRow));
+        setContentItems((appContentRes.data || []).map(contentFromRow));
         const settingsMap = {};
         (settingsRes.data || []).forEach((s) => { settingsMap[s.chave] = s.valor; });
         setGoogleClientId(settingsMap.googleClientId || "");
@@ -895,13 +992,21 @@ function App() {
     const novo = { ...patient, id: uid() };
     setPatients((prev) => [novo, ...prev]);
     supabaseClient.from("patients").insert(patientToRow(novo))
-      .then(() => {}).catch((e) => console.error("Falha ao criar paciente:", e));
+      .then(() => {})
+      .catch((e) => {
+        console.error("Falha ao criar paciente:", e);
+        logSync(`Não foi possível salvar ${novo.nome} no banco de dados. Ele está visível aqui, mas pode sumir ao recarregar a página — tente novamente.`, false);
+      });
   };
   const nomeDoPaciente = (pacienteId) => patients.find((p) => p.id === pacienteId)?.nome || "Paciente";
 
   const persistirPaciente = (paciente) => {
     supabaseClient.from("patients").update(patientToRow(paciente)).eq("id", paciente.id)
-      .then(() => {}).catch((e) => console.error("Falha ao salvar paciente:", e));
+      .then(() => {})
+      .catch((e) => {
+        console.error("Falha ao salvar paciente:", e);
+        logSync(`Não foi possível salvar as alterações de ${paciente.nome}. Verifique sua conexão e tente de novo.`, false);
+      });
   };
 
   const mutarPaciente = (id, transformFn) => {
@@ -1553,6 +1658,103 @@ function App() {
     mutarPaciente(id, (p) => ({ ...p, planoAcao }));
   };
 
+  const toggleAppPrograma = (id, programaId) => {
+    mutarPaciente(id, (p) => {
+      const atuais = p.app?.programas || [];
+      const programas = atuais.includes(programaId)
+        ? atuais.filter((x) => x !== programaId)
+        : [...atuais, programaId];
+      return { ...p, app: { ...(p.app || {}), status: p.app?.status || "inativo", programas } };
+    });
+  };
+
+  const setAppStatus = (id, status, motivo) => {
+    mutarPaciente(id, (p) => ({
+      ...p,
+      app: { ...(p.app || {}), status, motivoRevogacao: status === "revogado" ? (motivo || "") : "" }
+    }));
+  };
+
+  const salvarCardapio = (id, cardapio, publicar) => {
+    mutarPaciente(id, (p) => ({
+      ...p,
+      app: {
+        ...(p.app || {}),
+        cardapio: { ...cardapio, publicado: publicar ? true : (p.app?.cardapio?.publicado || false), atualizadoEm: new Date().toISOString() }
+      }
+    }));
+  };
+
+  const gerarConvite = (pacienteId, programas) => {
+    const paciente = patients.find((p) => p.id === pacienteId);
+    const novo = {
+      id: uid(),
+      pacienteId,
+      code: gerarCodigoConvite(paciente?.nome),
+      programas,
+      status: "gerado",
+      telefoneDestino: paciente?.whatsapp || paciente?.telefone || "",
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    };
+    setAppInvites((prev) => [
+      novo,
+      ...prev.map((inv) => (inv.pacienteId === pacienteId && inv.status !== "usado" ? { ...inv, status: "revogado" } : inv))
+    ]);
+    const revogados = appInvites.filter((inv) => inv.pacienteId === pacienteId && inv.status !== "usado");
+    revogados.forEach((inv) => {
+      supabaseClient.from("app_invites").update(appInviteToRow({ ...inv, status: "revogado" })).eq("id", inv.id)
+        .then(() => {}).catch((e) => console.error("Falha ao revogar convite anterior:", e));
+    });
+    supabaseClient.from("app_invites").insert(appInviteToRow(novo))
+      .then(() => {})
+      .catch((e) => {
+        console.error("Falha ao gerar convite:", e);
+        logSync(`O código ${novo.code} foi criado, mas não foi salvo no banco — pode não funcionar se a página for recarregada.`, false);
+      });
+    return novo;
+  };
+
+  const salvarConteudo = (item, { registrarVersao = true } = {}) => {
+    const anterior = contentItems.find((c) => c.id === item.id);
+    const existe = !!anterior;
+    let versoes = anterior?.versoes || [];
+    if (existe && registrarVersao && (anterior.corpo !== item.corpo || anterior.titulo !== item.titulo)) {
+      versoes = [
+        { titulo: anterior.titulo, corpo: anterior.corpo, status: anterior.status, salvoEm: anterior.updatedAt || new Date().toISOString() },
+        ...versoes
+      ].slice(0, 5);
+    }
+    const atualizado = { ...item, id: item.id || uid(), versoes, updatedAt: new Date().toISOString() };
+    setContentItems((prev) => existe ? prev.map((c) => (c.id === atualizado.id ? atualizado : c)) : [atualizado, ...prev]);
+    const op = existe
+      ? supabaseClient.from("app_content").update(contentToRow(atualizado)).eq("id", atualizado.id)
+      : supabaseClient.from("app_content").insert(contentToRow(atualizado));
+    op.then(() => {}).catch((e) => {
+      console.error("Falha ao salvar conteúdo:", e);
+      logSync(`Não foi possível salvar "${atualizado.titulo || "conteúdo sem título"}". Verifique sua conexão e tente de novo.`, false);
+    });
+    return atualizado;
+  };
+
+  const alternarPublicacao = (item) => {
+    salvarConteudo({ ...item, status: item.status === "publicado" ? "revisao" : "publicado" }, { registrarVersao: false });
+  };
+
+  const restaurarVersaoConteudo = (item, versao) => {
+    salvarConteudo({ ...item, titulo: versao.titulo, corpo: versao.corpo }, { registrarVersao: true });
+  };
+
+  const excluirConteudo = (id) => {
+    setContentItems((prev) => prev.filter((c) => c.id !== id));
+    supabaseClient.from("app_content").delete().eq("id", id)
+      .then(() => {})
+      .catch((e) => {
+        console.error("Falha ao excluir conteúdo:", e);
+        logSync("Não foi possível excluir o conteúdo no banco de dados.", false);
+      });
+  };
+
   const addExame = (id, exame) => {
     mutarPaciente(id, (p) => ({ ...p, exames: [...(p.exames || []), exame] }));
   };
@@ -1589,12 +1791,14 @@ function App() {
       )}
       <div style={styles.main}>
         <Header query={query} setQuery={setQuery} onMenuClick={() => setMobileNavOpen(true)} />
+      <SyncBanner syncLog={syncLog} onVerDetalhes={() => setView("integracoes")} />
         <div style={styles.content} className="content">
           {view === "dashboard" && <Dashboard patients={patients} followups={followups} setView={setView} setSelectedId={setSelectedId} setFiltroPacientesInicial={setFiltroPacientesInicial} />}
           {view === "patients" && <PatientsList patients={filteredPatients} events={events} onOpen={(id) => setSelectedId(id)} onNew={() => setShowNewPatient(true)} onQuickConsulta={registrarConsultaHoje} onExportar={exportarPacientesExcel} onImportar={importarPacientesExcel} filtroInicial={filtroPacientesInicial} />}
           {view === "agenda" && <Agenda patients={patients} events={events} onAdd={addEvent} onUpdate={updateEvent} onDelete={deleteEvent} />}
           {view === "followups" && <FollowupsBoard followups={followups} patients={patients} onMove={moveFollowup} onAdd={addFollowup} onDelete={deleteFollowup} onCriarProspeccao={criarFollowupsProspeccao} />}
           {view === "financeiro" && <Financeiro patients={patients} onAddPagamento={addPagamento} />}
+          {view === "appContent" && <AppContent items={contentItems} onSave={salvarConteudo} onDelete={excluirConteudo} onTogglePublish={alternarPublicacao} onRestaurarVersao={restaurarVersaoConteudo} />}
           {view === "administracao" && (
             <Administracao patients={patients} contratosModelo={contratosModelo} setContratosModelo={setContratosModelo} />
           )}
@@ -1636,10 +1840,15 @@ function App() {
           onDeleteExame={(eid) => deleteExame(selectedPatient.id, eid)}
           onAddMarcoAlimentar={(m) => addMarcoAlimentar(selectedPatient.id, m)}
           onDeleteMarcoAlimentar={(mid) => deleteMarcoAlimentar(selectedPatient.id, mid)}
+          appInvites={appInvites.filter((inv) => inv.pacienteId === selectedPatient.id)}
+          onToggleAppPrograma={(programaId) => toggleAppPrograma(selectedPatient.id, programaId)}
+          onSetAppStatus={(status, motivo) => setAppStatus(selectedPatient.id, status, motivo)}
+          onGerarConvite={(programas) => gerarConvite(selectedPatient.id, programas)}
+          onSalvarCardapio={(cardapio, publicar) => salvarCardapio(selectedPatient.id, cardapio, publicar)}
         />
       )}
       {showNewPatient && (
-        <NewPatientModal onClose={() => setShowNewPatient(false)} onSave={(p) => { addPatient(p); setShowNewPatient(false); }} />
+        <NewPatientModal patients={patients} onClose={() => setShowNewPatient(false)} onSave={(p) => { addPatient(p); setShowNewPatient(false); }} />
       )}
     </div>
   );
@@ -1652,6 +1861,7 @@ function Sidebar({ view, setView, onNewPatient, mobileOpen, onClose }) {
     { id: "agenda", label: "Agenda", icon: CalendarIcon },
     { id: "followups", label: "Follow-up", icon: CheckSquare },
     { id: "financeiro", label: "Financeiro", icon: DollarSign },
+    { id: "appContent", label: "Conteúdo do app", icon: Upload },
     { id: "administracao", label: "Administração", icon: FileText },
     { id: "integracoes", label: "Integrações", icon: Settings }
   ];
@@ -1685,18 +1895,20 @@ function Sidebar({ view, setView, onNewPatient, mobileOpen, onClose }) {
           const Icon = it.icon;
           const active = view === it.id;
           return (
-            <div
+            <button
               key={it.id}
               onClick={() => setView(it.id)}
+              aria-current={active ? "page" : undefined}
               style={{
                 ...styles.navItem,
+                width: "100%", textAlign: "left", border: "none", font: "inherit",
                 background: active ? "#867A6E" : "transparent",
                 color: active ? "#F6F0E7" : "#6E6355"
               }}
             >
               <Icon size={17} />
               <span>{it.label}</span>
-            </div>
+            </button>
           );
         })}
       </nav>
@@ -1736,6 +1948,179 @@ function Header({ query, setQuery, onMenuClick }) {
         </div>
       </div>
       <div className="header-date" style={{ fontSize: 13, color: "#9C9284", textTransform: "capitalize", flexShrink: 0, marginLeft: 12 }}>{hoje}</div>
+    </div>
+  );
+}
+
+function SyncBanner({ syncLog, onVerDetalhes }) {
+  const ultimoErro = syncLog.find((l) => !l.ok);
+  const [dispensado, setDispensado] = useState(null);
+  if (!ultimoErro || dispensado === ultimoErro.id) return null;
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10, background: "#F7E6DF",
+      borderBottom: "1px solid #E6C7BA", padding: "9px 20px", fontSize: 12.5, color: "#8A4A34"
+    }}>
+      <AlertTriangle size={14} />
+      <span style={{ flex: 1 }}>{ultimoErro.msg}</span>
+      <button onClick={onVerDetalhes} style={{ background: "none", border: "none", color: "#8A4A34", fontWeight: 700, fontSize: 12.5, textDecoration: "underline", padding: 0 }}>
+        Ver detalhes
+      </button>
+      <button onClick={() => setDispensado(ultimoErro.id)} aria-label="Dispensar aviso" style={{ background: "none", border: "none", color: "#8A4A34", padding: 0, display: "flex" }}>
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------
+   Conteúdo do app
+--------------------------------------------------------- */
+function AppContent({ items, onSave, onDelete, onTogglePublish, onRestaurarVersao }) {
+  const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [editando, setEditando] = useState(null);
+  const [mostrarForm, setMostrarForm] = useState(false);
+
+  const contagem = {
+    publicado: items.filter((c) => c.status === "publicado").length,
+    revisao: items.filter((c) => c.status === "revisao").length,
+    aguardando: items.filter((c) => c.status === "aguardando" || c.status === "rascunho").length
+  };
+
+  const visiveis = filtroTipo === "todos" ? items : items.filter((c) => c.tipo === filtroTipo);
+
+  const novoItem = () => {
+    setEditando({ id: null, tipo: "corte", titulo: "", fase: "", nivelMinimo: "gratuito", status: "aguardando", corpo: "", fontes: "" });
+    setMostrarForm(true);
+  };
+  const abrirEdicao = (item) => { setEditando({ ...item }); setMostrarForm(true); };
+  const salvar = () => {
+    if (!editando.titulo.trim()) return;
+    onSave(editando);
+    setMostrarForm(false);
+    setEditando(null);
+  };
+
+  return (
+    <div>
+      <SectionTitle
+        title="Conteúdo do app"
+        subtitle="O que você publica aqui aparece para as mães conforme a fase e o programa"
+        action={<button style={styles.primaryBtn} onClick={novoItem}><Plus size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Novo conteúdo</button>}
+      />
+
+      <div className="cards-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 18 }}>
+        <MetricCard label="Publicados" value={contagem.publicado} icon={CheckCircle2} accent="#918567" />
+        <MetricCard label="Em revisão" value={contagem.revisao} icon={Clock} accent="#B4863F" />
+        <MetricCard label="Aguardando material" value={contagem.aguardando} icon={AlertTriangle} accent="#A99790" />
+      </div>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+        <button onClick={() => setFiltroTipo("todos")} style={{ ...styles.secondaryBtn, ...(filtroTipo === "todos" ? { background: "#867A6E", color: "#F6F0E7" } : {}) }}>Todos</button>
+        {CONTEUDO_TIPOS.map((t) => (
+          <button key={t.id} onClick={() => setFiltroTipo(t.id)} style={{ ...styles.secondaryBtn, ...(filtroTipo === t.id ? { background: "#867A6E", color: "#F6F0E7" } : {}) }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {mostrarForm && editando && (
+        <div style={{ ...styles.panel, marginBottom: 16 }}>
+          <div style={styles.miniTitle}>{editando.id ? "Editar conteúdo" : "Novo conteúdo"}</div>
+          <div className="new-patient-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <Field label="Título" value={editando.titulo} onChange={(v) => setEditando((f) => ({ ...f, titulo: v }))} full />
+            <Field label="Tipo" type="select" options={CONTEUDO_TIPOS.map((t) => t.label)}
+              value={CONTEUDO_TIPOS.find((t) => t.id === editando.tipo)?.label}
+              onChange={(label) => setEditando((f) => ({ ...f, tipo: CONTEUDO_TIPOS.find((t) => t.label === label)?.id }))} />
+            <Field label="Fase (1 a 8, opcional)" type="number" value={editando.fase} onChange={(v) => setEditando((f) => ({ ...f, fase: v }))} />
+            <Field label="Acesso" type="select" options={["Gratuito", "Pago"]}
+              value={editando.nivelMinimo === "pago" ? "Pago" : "Gratuito"}
+              onChange={(v) => setEditando((f) => ({ ...f, nivelMinimo: v === "Pago" ? "pago" : "gratuito" }))} />
+            <Field label="Status" type="select" options={["Aguardando material", "Rascunho", "Em revisão", "Publicado"]}
+              value={CONTEUDO_STATUS[editando.status]?.label}
+              onChange={(label) => setEditando((f) => ({ ...f, status: Object.keys(CONTEUDO_STATUS).find((k) => CONTEUDO_STATUS[k].label === label) }))} />
+            <Field label="Fontes (SBP, OMS, Ministério da Saúde...)" value={editando.fontes} onChange={(v) => setEditando((f) => ({ ...f, fontes: v }))} />
+            <div style={{ gridColumn: "1 / -1" }}>
+              <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>Texto do conteúdo</div>
+              <textarea
+                value={editando.corpo}
+                onChange={(e) => setEditando((f) => ({ ...f, corpo: e.target.value }))}
+                placeholder="Escreva o conteúdo que aparecerá para as mães no app..."
+                style={{ ...styles.input, minHeight: 140, resize: "vertical", fontFamily: "Lato, sans-serif" }}
+              />
+            </div>
+          </div>
+          {editando.id && editando.versoes && editando.versoes.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={styles.divider} />
+              <div style={styles.miniTitle}>Versões anteriores ({editando.versoes.length})</div>
+              {editando.versoes.map((v, idx) => (
+                <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid #E3DACB" }}>
+                  <div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "#867A6E" }}>{v.titulo}</div>
+                    <div style={{ fontSize: 11, color: "#9C9284" }}>Salva em {formatData((v.salvoEm || "").slice(0, 10))}</div>
+                  </div>
+                  <button
+                    style={{ ...styles.secondaryBtn, padding: "5px 10px", fontSize: 11.5 }}
+                    onClick={() => { if (window.confirm("Restaurar esta versão? O texto atual vira uma nova versão no histórico.")) { onRestaurarVersao(editando, v); setMostrarForm(false); setEditando(null); } }}
+                  >
+                    Restaurar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+            <button style={styles.secondaryBtn} onClick={() => { setMostrarForm(false); setEditando(null); }}>Cancelar</button>
+            <button style={styles.primaryBtn} disabled={!editando.titulo.trim()} onClick={salvar}>Salvar</button>
+          </div>
+        </div>
+      )}
+
+      <div style={styles.panel}>
+        <div style={styles.tableHeader} className="table-header">
+          <div style={{ flex: 2 }}>Conteúdo</div>
+          <div style={{ flex: 1 }}>Tipo</div>
+          <div style={{ flex: 0.6 }}>Fase</div>
+          <div style={{ flex: 1 }}>Acesso</div>
+          <div style={{ flex: 1 }}>Status</div>
+          <div style={{ width: 190 }} />
+        </div>
+        {visiveis.length === 0 && <div style={styles.emptyRow}>Nenhum conteúdo cadastrado ainda neste filtro.</div>}
+        {visiveis.map((c) => (
+          <div key={c.id} style={styles.tableRow} className="table-row">
+            <div style={{ flex: 2, fontWeight: 600, color: "#867A6E" }}>{c.titulo}</div>
+            <div style={{ flex: 1, fontSize: 13, color: "#6E6355" }} data-label="Tipo">{CONTEUDO_TIPOS.find((t) => t.id === c.tipo)?.label || c.tipo}</div>
+            <div style={{ flex: 0.6, fontSize: 13, color: "#6E6355" }} data-label="Fase">{c.fase || "—"}</div>
+            <div style={{ flex: 1, fontSize: 13, color: "#6E6355" }} data-label="Acesso">{c.nivelMinimo === "pago" ? "Pago" : "Gratuito"}</div>
+            <div style={{ flex: 1 }} data-label="Status">
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20,
+                background: CONTEUDO_STATUS[c.status]?.bg, color: CONTEUDO_STATUS[c.status]?.color
+              }}>
+                {CONTEUDO_STATUS[c.status]?.label}
+              </span>
+            </div>
+            <div style={{ width: 190, display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "center" }}>
+              {(c.status === "publicado" || c.status === "revisao") && (
+                <button
+                  onClick={() => onTogglePublish(c)}
+                  style={c.status === "publicado" ? styles.secondaryBtn : { ...styles.primaryBtn, padding: "6px 10px", fontSize: 12 }}
+                >
+                  {c.status === "publicado" ? "Despublicar" : "Publicar"}
+                </button>
+              )}
+              <button title="Editar" onClick={() => abrirEdicao(c)} style={{ background: "none", border: "none", color: "#9C9284", cursor: "pointer", display: "flex", padding: 0 }}>
+                <Pencil size={14} />
+              </button>
+              <button title="Excluir" onClick={() => { if (window.confirm(`Excluir "${c.titulo}"? Essa ação não pode ser desfeita.`)) onDelete(c.id); }} style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", display: "flex", padding: 0 }}>
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -2166,7 +2551,15 @@ function StatusPill({ status }) {
   );
 }
 
-function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedicao, onAddPagamento, onAddSessao, onSetTipoAcompanhamento, onDeletePatient, onSetPlanoAcao, onAddExame, onDeleteExame, onAddMarcoAlimentar, onDeleteMarcoAlimentar }) {
+function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedicao, onAddPagamento, onAddSessao, onSetTipoAcompanhamento, onDeletePatient, onSetPlanoAcao, onAddExame, onDeleteExame, onAddMarcoAlimentar, onDeleteMarcoAlimentar, appInvites, onToggleAppPrograma, onSetAppStatus, onGerarConvite, onSalvarCardapio }) {
+  const [showGerarConvite, setShowGerarConvite] = useState(false);
+  const [convitePrograma, setConvitePrograma] = useState([]);
+  const [conviteGerado, setConviteGerado] = useState(null);
+  const [showRevogar, setShowRevogar] = useState(false);
+  const [motivoRevogacao, setMotivoRevogacao] = useState("");
+  const [showCardapio, setShowCardapio] = useState(false);
+  const [cardapioForm, setCardapioForm] = useState(null);
+  const [cardapioSalvo, setCardapioSalvo] = useState(false);
   const [showMedicaoForm, setShowMedicaoForm] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [showSessaoForm, setShowSessaoForm] = useState(false);
@@ -2510,6 +2903,254 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                   <span key={t} style={styles.tagPill}><TagIcon size={11} /> {t}</span>
                 ))}
               </div>
+
+              <div style={styles.divider} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={styles.miniTitle}>Aplicativo Afeto à Mesa</div>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20,
+                  background: patient.app?.status === "ativo" ? "#DCE8D8" : patient.app?.status === "revogado" ? "#F7E6DF" : "#EFE6D8",
+                  color: patient.app?.status === "ativo" ? "#3D5A40" : patient.app?.status === "revogado" ? "#8A4A34" : "#867A6E"
+                }}>
+                  {patient.app?.status === "ativo" ? "Vinculada ao app" : patient.app?.status === "revogado" ? "Acesso revogado" : "Não vinculada"}
+                </span>
+              </div>
+
+              <div style={{ fontSize: 12, color: "#9C9284", marginBottom: 10 }}>
+                Programas liberados automaticamente para {patient.nome} no app, sem custo adicional, enquanto o acompanhamento estiver ativo.
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+                {APP_PROGRAMAS.map((prog) => {
+                  const ligado = (patient.app?.programas || []).includes(prog.id);
+                  return (
+                    <label key={prog.id} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "9px 12px", borderRadius: 8, border: "1px solid #E3DACB",
+                      background: ligado ? "#F4EFE4" : "#FFFFFF", cursor: "pointer"
+                    }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#6E6355" }}>
+                        <input type="checkbox" checked={ligado} onChange={() => onToggleAppPrograma(prog.id)} style={{ accentColor: "#867A6E", width: 16, height: 16 }} />
+                        {prog.label}
+                      </span>
+                      {ligado && <span style={{ fontSize: 11, color: "#918567", fontWeight: 600 }}>Liberado</span>}
+                    </label>
+                  );
+                })}
+              </div>
+
+              {patient.app?.status === "revogado" && patient.app?.motivoRevogacao && (
+                <div style={{ ...styles.emptyRow, background: "#F7E6DF", borderRadius: 8, padding: "8px 12px", marginBottom: 10 }}>
+                  Motivo da revogação: {patient.app.motivoRevogacao}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                <button
+                  style={styles.primaryBtn}
+                  onClick={() => { setConvitePrograma(patient.app?.programas || []); setConviteGerado(null); setShowGerarConvite(true); }}
+                >
+                  <Link2 size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Gerar convite do app
+                </button>
+                {patient.app?.status !== "revogado" ? (
+                  <button style={styles.secondaryBtn} onClick={() => setShowRevogar(true)}>Revogar acesso</button>
+                ) : (
+                  <button style={styles.secondaryBtn} onClick={() => onSetAppStatus("ativo")}>Reativar acesso</button>
+                )}
+              </div>
+
+              {showRevogar && (
+                <div style={{ ...styles.panel, marginBottom: 14 }}>
+                  <div style={{ fontSize: 12.5, color: "#6E6355", marginBottom: 8 }}>
+                    Isso bloqueia o acesso de {patient.nome} aos programas no app. O diário e o histórico continuam visíveis para a família.
+                  </div>
+                  <Field label="Motivo (obrigatório)" value={motivoRevogacao} onChange={setMotivoRevogacao} full />
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+                    <button style={styles.secondaryBtn} onClick={() => setShowRevogar(false)}>Cancelar</button>
+                    <button
+                      style={{ ...styles.primaryBtn, background: "#A99790" }}
+                      disabled={!motivoRevogacao.trim()}
+                      onClick={() => { onSetAppStatus("revogado", motivoRevogacao); setShowRevogar(false); setMotivoRevogacao(""); }}
+                    >
+                      Confirmar revogação
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {showGerarConvite && (
+                <div style={{ ...styles.panel, marginBottom: 14 }}>
+                  <div style={styles.miniTitle}>Programas a liberar</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                    {APP_PROGRAMAS.map((prog) => (
+                      <label key={prog.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#6E6355" }}>
+                        <input
+                          type="checkbox"
+                          checked={convitePrograma.includes(prog.id)}
+                          onChange={() => setConvitePrograma((prev) => prev.includes(prog.id) ? prev.filter((x) => x !== prog.id) : [...prev, prog.id])}
+                          style={{ accentColor: "#867A6E", width: 16, height: 16 }}
+                        />
+                        {prog.label}
+                      </label>
+                    ))}
+                  </div>
+                  {!conviteGerado ? (
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                      <button style={styles.secondaryBtn} onClick={() => setShowGerarConvite(false)}>Cancelar</button>
+                      <button
+                        style={styles.primaryBtn}
+                        disabled={convitePrograma.length === 0}
+                        onClick={() => setConviteGerado(onGerarConvite(convitePrograma))}
+                      >
+                        Gerar código
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{
+                        textAlign: "center", background: "#F6F0E7", borderRadius: 10, padding: "16px 10px", marginBottom: 12
+                      }}>
+                        <div style={{ fontSize: 11, color: "#9C9284", letterSpacing: 0.5 }}>CÓDIGO GERADO</div>
+                        <div style={{ fontFamily: "Playfair Display, serif", fontSize: 26, letterSpacing: 3, color: "#867A6E", marginTop: 4 }}>
+                          {conviteGerado.code}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "#9C9284", marginTop: 4 }}>Uso único · expira em 7 dias</div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          style={styles.secondaryBtn}
+                          onClick={() => navigator.clipboard?.writeText(conviteGerado.code)}
+                        >
+                          Copiar código
+                        </button>
+                        {linkWhatsApp(patient.whatsapp || patient.telefone) && (
+                          <a
+                            href={linkWhatsApp(
+                              patient.whatsapp || patient.telefone,
+                              `Olá, ${patient.responsavel || ""}! Seu acesso ao app Afeto à Mesa está pronto.\n\n1. Baixe o app\n2. Escolha "Sim, sou paciente"\n3. Digite o código ${conviteGerado.code}\n\nOs programas combinados já estarão liberados para ${patient.nome}. O código é válido por 7 dias.\n\nNutrir com afeto,\nBárbara Padovani`
+                            )}
+                            target="_blank" rel="noopener noreferrer"
+                            style={{ ...styles.primaryBtn, textDecoration: "none" }}
+                          >
+                            <MessageCircle size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Enviar pelo WhatsApp
+                          </a>
+                        )}
+                      </div>
+                      <button style={{ ...styles.secondaryBtn, marginTop: 8, width: "100%" }} onClick={() => setShowGerarConvite(false)}>Fechar</button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {appInvites && appInvites.length > 0 && (
+                <div>
+                  <div style={styles.miniTitle}>Histórico de convites</div>
+                  {appInvites.map((inv) => (
+                    <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #E3DACB" }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#867A6E" }}>{inv.code}</div>
+                        <div style={{ fontSize: 11.5, color: "#9C9284" }}>
+                          {(inv.programas || []).map((pid) => APP_PROGRAMAS.find((p) => p.id === pid)?.label || pid).join(" · ")}
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 20,
+                        background: inv.status === "usado" ? "#DCE8D8" : inv.status === "revogado" ? "#F1EBDD" : "#EFE6D8",
+                        color: inv.status === "usado" ? "#3D5A40" : "#867A6E"
+                      }}>
+                        {inv.status === "usado" ? "Usado" : inv.status === "revogado" ? "Substituído" : "Aguardando"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={styles.divider} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={styles.miniTitle}>Cardápio individual do app</div>
+                {patient.app?.cardapio?.publicado && (
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: "#DCE8D8", color: "#3D5A40" }}>
+                    Publicado
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: "#9C9284", marginBottom: 10 }}>
+                Substitui o cardápio modelo da fase para {patient.nome} no app. A família é avisada quando você publica.
+              </div>
+              {patient.app?.cardapio?.atualizadoEm && (
+                <div style={{ fontSize: 11.5, color: "#9C9284", marginBottom: 10 }}>
+                  Última atualização: {formatData(patient.app.cardapio.atualizadoEm.slice(0, 10))}
+                </div>
+              )}
+              {!showCardapio ? (
+                <button
+                  style={styles.secondaryBtn}
+                  onClick={() => { setCardapioForm(patient.app?.cardapio || cardapioVazio()); setShowCardapio(true); setCardapioSalvo(false); }}
+                >
+                  {patient.app?.cardapio?.atualizadoEm ? "Editar cardápio" : "Montar cardápio"}
+                </button>
+              ) : (
+                <div style={styles.panel}>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 720 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: "left", fontSize: 11, color: "#9C9284", textTransform: "uppercase", letterSpacing: 0.4, padding: "0 8px 8px 0", width: 110 }}>Refeição</th>
+                          {DIAS_SEMANA_CARDAPIO.map((d) => (
+                            <th key={d.id} style={{ textAlign: "left", fontSize: 11, color: "#9C9284", textTransform: "uppercase", letterSpacing: 0.4, padding: "0 8px 8px" }}>{d.label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {REFEICOES_CARDAPIO.map((ref) => (
+                          <tr key={ref.id}>
+                            <td style={{ fontSize: 12.5, fontWeight: 600, color: "#867A6E", padding: "4px 8px 4px 0", verticalAlign: "top" }}>{ref.label}</td>
+                            {DIAS_SEMANA_CARDAPIO.map((d) => (
+                              <td key={d.id} style={{ padding: 4, verticalAlign: "top" }}>
+                                <textarea
+                                  value={cardapioForm.grade[d.id][ref.id]}
+                                  onChange={(e) => setCardapioForm((f) => ({
+                                    ...f, grade: { ...f.grade, [d.id]: { ...f.grade[d.id], [ref.id]: e.target.value } }
+                                  }))}
+                                  placeholder="Ex.: Abóbora 60g (4 col. sopa) + frango 40g"
+                                  style={{
+                                    width: 150, minHeight: 52, resize: "vertical", fontSize: 12, fontFamily: "Lato, sans-serif",
+                                    border: "1px solid #E3DACB", borderRadius: 6, padding: 6, color: "#6E6355"
+                                  }}
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>Observações para a família</div>
+                    <textarea
+                      value={cardapioForm.observacoes}
+                      onChange={(e) => setCardapioForm((f) => ({ ...f, observacoes: e.target.value }))}
+                      placeholder="Orientações individuais sobre este cardápio..."
+                      style={{ ...styles.input, minHeight: 70, resize: "vertical", fontFamily: "Lato, sans-serif" }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+                    <button style={styles.secondaryBtn} onClick={() => setShowCardapio(false)}>Fechar</button>
+                    <button
+                      style={styles.secondaryBtn}
+                      onClick={() => { onSalvarCardapio(cardapioForm, false); setCardapioSalvo(true); setTimeout(() => setCardapioSalvo(false), 2000); }}
+                    >
+                      Salvar rascunho
+                    </button>
+                    <button
+                      style={styles.primaryBtn}
+                      onClick={() => { onSalvarCardapio(cardapioForm, true); setShowCardapio(false); }}
+                    >
+                      Publicar no app
+                    </button>
+                  </div>
+                  {cardapioSalvo && <div style={{ fontSize: 12, color: "#918567", fontWeight: 600, marginTop: 8, textAlign: "right" }}>Rascunho salvo ✓</div>}
+                </div>
+              )}
             </div>
           )}
 
@@ -3047,7 +3688,7 @@ function InfoGrid({ items }) {
   );
 }
 
-function NewPatientModal({ onClose, onSave }) {
+function NewPatientModal({ onClose, onSave, patients }) {
   const [form, setForm] = useState({
     nome: "", dataNascimento: "", sexo: "F", escola: "", diagnostico: "",
     alergias: "", medicamentos: "", pediatra: "", responsavel: "",
@@ -3080,6 +3721,16 @@ function NewPatientModal({ onClose, onSave }) {
     if (!form.nome.trim()) {
       setErro("Informe o nome da criança para salvar.");
       return;
+    }
+    const telefoneNovo = (form.telefone || "").replace(/\D/g, "");
+    if (telefoneNovo.length >= 8) {
+      const duplicado = (patients || []).find((p) => (p.telefone || "").replace(/\D/g, "") === telefoneNovo);
+      if (duplicado) {
+        const seguir = window.confirm(
+          `Já existe uma paciente cadastrada com esse telefone: ${duplicado.nome}. Deseja cadastrar mesmo assim (ex.: irmãos que compartilham o telefone da família)?`
+        );
+        if (!seguir) return;
+      }
     }
     onSave({
       ...form,
