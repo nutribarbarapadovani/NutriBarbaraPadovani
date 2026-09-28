@@ -438,11 +438,14 @@ const seedFollowups = () => IMPORTED_FOLLOWUPS;
 
 
 const KANBAN_COLS = [
-  { id: "afazer", label: "A fazer" },
-  { id: "hoje", label: "Hoje" },
-  { id: "andamento", label: "Em andamento" },
-  { id: "aguardando", label: "Aguardando família" },
+  { id: "afazer", label: "Pendente" },
   { id: "concluido", label: "Concluído" }
+];
+
+const ETIQUETAS_CONTATO = [
+  { id: "agendado", label: "Agendado", color: "#7C9885" },
+  { id: "a_agendar", label: "A agendar", color: "#C9A24B" },
+  { id: "sem_resposta", label: "Sem resposta", color: "#A99790" }
 ];
 
 const STATUS_LABEL = { ativo: "Ativo", pausa: "Inativo", concluido: "Recebeu alta", prospect: "Prospecção" };
@@ -708,14 +711,16 @@ function followupToRow(f) {
   return {
     id: f.id, paciente_id: f.pacienteId, titulo: f.titulo, tipo: f.tipo || "",
     prioridade: f.prioridade || "media", prazo: f.prazo || null, coluna: f.coluna || "afazer",
-    responsavel: f.responsavel || "Nutricionista", google_event_id: f.googleEventId || null
+    responsavel: f.responsavel || "Nutricionista", google_event_id: f.googleEventId || null,
+    contatado_em: f.contatadoEm || null, etiqueta_contato: f.etiquetaContato || "", nota_contato: f.notaContato || ""
   };
 }
 function followupFromRow(r) {
   return {
     id: r.id, pacienteId: r.paciente_id, titulo: r.titulo, tipo: r.tipo || "",
     prioridade: r.prioridade || "media", prazo: r.prazo || "", coluna: r.coluna || "afazer",
-    responsavel: r.responsavel || "Nutricionista", googleEventId: r.google_event_id || undefined
+    responsavel: r.responsavel || "Nutricionista", googleEventId: r.google_event_id || undefined,
+    contatadoEm: r.contatado_em || "", etiquetaContato: r.etiqueta_contato || "", notaContato: r.nota_contato || ""
   };
 }
 
@@ -1238,6 +1243,17 @@ function App() {
     }
   };
 
+  const atualizarFollowup = (id, patch) => {
+    setFollowups((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+    const rowPatch = {};
+    if ("contatadoEm" in patch) rowPatch.contatado_em = patch.contatadoEm || null;
+    if ("etiquetaContato" in patch) rowPatch.etiqueta_contato = patch.etiquetaContato || "";
+    if ("notaContato" in patch) rowPatch.nota_contato = patch.notaContato || "";
+    if ("coluna" in patch) rowPatch.coluna = patch.coluna;
+    supabaseClient.from("followups").update(rowPatch).eq("id", id)
+      .then(() => {}).catch((e) => console.error("Falha ao atualizar follow-up:", e));
+  };
+
   const addFollowup = (followup) => {
     const localId = uid();
     const novo = { ...followup, id: localId };
@@ -1593,7 +1609,7 @@ function App() {
           {view === "dashboard" && <Dashboard patients={patients} followups={followups} setView={setView} setSelectedId={setSelectedId} setFiltroPacientesInicial={setFiltroPacientesInicial} />}
           {view === "patients" && <PatientsList patients={filteredPatients} events={events} onOpen={(id) => setSelectedId(id)} onNew={() => setShowNewPatient(true)} onQuickConsulta={registrarConsultaHoje} onExportar={exportarPacientesExcel} onImportar={importarPacientesExcel} filtroInicial={filtroPacientesInicial} />}
           {view === "agenda" && <Agenda patients={patients} events={events} onAdd={addEvent} onUpdate={updateEvent} onDelete={deleteEvent} />}
-          {view === "followups" && <FollowupsBoard followups={followups} patients={patients} onMove={moveFollowup} onAdd={addFollowup} onDelete={deleteFollowup} onCriarProspeccao={criarFollowupsProspeccao} />}
+          {view === "followups" && <FollowupsBoard followups={followups} patients={patients} onMove={moveFollowup} onUpdate={atualizarFollowup} onAdd={addFollowup} onDelete={deleteFollowup} onCriarProspeccao={criarFollowupsProspeccao} />}
           {view === "financeiro" && <Financeiro patients={patients} onAddPagamento={addPagamento} />}
           {view === "administracao" && (
             <Administracao patients={patients} contratosModelo={contratosModelo} setContratosModelo={setContratosModelo} />
@@ -3260,7 +3276,7 @@ function Agenda({ patients, events, onAdd, onUpdate, onDelete }) {
             </div>
             {lista.map((e) => (
               <div key={e.id} style={styles.agendaRow} className="agenda-row">
-                <Calendar size={15} color={EVENT_STATUS_COLOR[e.status]} />
+                <CalendarIcon size={15} color={EVENT_STATUS_COLOR[e.status]} />
                 <div className="agenda-name" style={{ fontWeight: 600, color: "#867A6E", width: 180 }}>
                   {patientName(e.pacienteId)}
                   {e.hora && <span style={{ color: "#9C9284", fontWeight: 400 }}> · {e.hora}</span>}
@@ -3367,9 +3383,11 @@ function EventModal({ patients, event, onClose, onSave }) {
   );
 }
 
-function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarProspeccao }) {
+function FollowupsBoard({ followups, patients, onMove, onUpdate, onAdd, onDelete, onCriarProspeccao }) {
   const [showModal, setShowModal] = useState(false);
   const [aba, setAba] = useState("atrasadas");
+  const [ordenacao, setOrdenacao] = useState("padrao");
+  const [historico, setHistorico] = useState({});
   const patientOf = (id) => patients.find((p) => p.id === id);
   const patientName = (id) => patientOf(id)?.nome || "—";
   const mensagemReativacao = (p) =>
@@ -3378,12 +3396,156 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
     `Oiê ${p?.responsavel || ""}! Passando para saber se conseguiu pensar em um horário para o retorno da ${p?.nome || ""}. Qualquer horário, me avisa! 💛`;
   const mensagemPara = (f, p) => (f.tipo === "Consulta atrasada" ? mensagemConsultaAtrasada(p) : mensagemReativacao(p));
 
-  const contagemProspeccao = followups.filter((f) => patientOf(f.pacienteId)?.status === "prospect").length;
-  const contagemAtrasadas = followups.length - contagemProspeccao;
-  const followupsFiltrados = followups.filter((f) => {
+  const naoConcluidos = followups.filter((f) => f.coluna !== "concluido");
+  const contagemProspeccao = naoConcluidos.filter((f) => patientOf(f.pacienteId)?.status === "prospect").length;
+  const contagemAtrasadas = naoConcluidos.length - contagemProspeccao;
+  const followupsFiltrados = naoConcluidos.filter((f) => {
     const ehProspeccao = patientOf(f.pacienteId)?.status === "prospect";
     return aba === "prospeccao" ? ehProspeccao : !ehProspeccao;
   });
+
+  const PRIORIDADE_ORDEM = { alta: 0, media: 1, baixa: 2 };
+  const ordenar = (lista) => {
+    const copia = [...lista];
+    if (ordenacao === "nome") {
+      copia.sort((a, b) => patientName(a.pacienteId).localeCompare(patientName(b.pacienteId), "pt-BR"));
+    } else if (ordenacao === "contato") {
+      copia.sort((a, b) => new Date(b.contatadoEm || 0) - new Date(a.contatadoEm || 0));
+    } else if (ordenacao === "idade") {
+      copia.sort((a, b) => {
+        const na = patientOf(a.pacienteId)?.dataNascimento, nb = patientOf(b.pacienteId)?.dataNascimento;
+        if (!na && !nb) return 0;
+        if (!na) return 1;
+        if (!nb) return -1;
+        return new Date(na) - new Date(nb);
+      });
+    } else {
+      copia.sort((a, b) => (PRIORIDADE_ORDEM[a.prioridade] ?? 1) - (PRIORIDADE_ORDEM[b.prioridade] ?? 1) || new Date(a.prazo || 0) - new Date(b.prazo || 0));
+    }
+    return copia;
+  };
+
+  const aindaNaoConversou = ordenar(followupsFiltrados.filter((f) => !f.contatadoEm));
+  const jaConversou = ordenar(followupsFiltrados.filter((f) => f.contatadoEm));
+
+  const marcarContato = (f) => {
+    if (!onUpdate) return;
+    onUpdate(f.id, { contatadoEm: new Date().toISOString().slice(0, 10) });
+  };
+
+  const alternarHistorico = (f) => {
+    setHistorico((prev) => {
+      if (prev[f.id]) {
+        const copia = { ...prev };
+        delete copia[f.id];
+        return copia;
+      }
+      return { ...prev, [f.id]: "carregando" };
+    });
+    if (historico[f.id]) return;
+    supabaseClient.from("whatsapp_log").select("*").eq("paciente_id", f.pacienteId)
+      .order("criado_em", { ascending: false }).limit(10)
+      .then(({ data }) => setHistorico((prev) => ({ ...prev, [f.id]: data || [] })))
+      .catch(() => setHistorico((prev) => ({ ...prev, [f.id]: [] })));
+  };
+
+  const renderCard = (f) => {
+    const paciente = patientOf(f.pacienteId);
+    const linkWpp = paciente ? linkWhatsApp(paciente.whatsapp || paciente.telefone, f.mensagemSugerida || mensagemPara(f, paciente)) : null;
+    return (
+      <div key={f.id} style={styles.kanbanCard}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#867A6E" }}>{f.titulo}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 8, background: PRIORIDADE_COLOR[f.prioridade], marginTop: 4 }} />
+            <button
+              title="Marcar como concluído"
+              onClick={() => onMove(f.id, "concluido")}
+              style={{ background: "none", border: "none", color: "#9C9284", cursor: "pointer", padding: 0, display: "flex" }}
+            >
+              <CheckCircle2 size={14} />
+            </button>
+            <button
+              title="Excluir follow-up"
+              onClick={() => { if (window.confirm("Excluir este follow-up? Essa ação não pode ser desfeita.")) onDelete(f.id); }}
+              style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", padding: 0, display: "flex" }}
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: "#9C9284", marginTop: 4 }}>
+          {patientName(f.pacienteId)}{paciente?.dataNascimento ? ` · ${calcIdade(paciente.dataNascimento)}` : ""}
+        </div>
+        {f.contatadoEm ? (
+          <div style={{ fontSize: 11, color: "#7C9885", marginTop: 6, fontWeight: 600 }}>
+            Conversei em {formatData(f.contatadoEm)}
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, color: "#9C9284", marginTop: 6 }}>
+            Prazo {formatData(f.prazo)} · {f.responsavel}
+          </div>
+        )}
+        {linkWpp && (
+          <a
+            href={linkWpp} target="_blank" rel="noopener noreferrer"
+            onClick={() => marcarContato(f)}
+            style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, color: "#918567", fontWeight: 600, textDecoration: "none" }}
+          >
+            <MessageCircle size={13} /> {f.tipo === "Consulta atrasada" ? "Cobrar retorno por WhatsApp" : "Reativar por WhatsApp"}
+          </a>
+        )}
+        {f.contatadoEm && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {ETIQUETAS_CONTATO.map((et) => (
+                <button
+                  key={et.id}
+                  onClick={() => onUpdate(f.id, { etiquetaContato: f.etiquetaContato === et.id ? "" : et.id })}
+                  style={{
+                    fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 12, cursor: "pointer",
+                    border: `1px solid ${f.etiquetaContato === et.id ? et.color : "#E3DACB"}`,
+                    background: f.etiquetaContato === et.id ? et.color : "#FFFFFF",
+                    color: f.etiquetaContato === et.id ? "#FFFFFF" : "#6E6355"
+                  }}
+                >
+                  {et.label}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text" placeholder="O que aconteceu? (opcional)"
+              defaultValue={f.notaContato || ""}
+              onBlur={(e) => { if (e.target.value !== (f.notaContato || "")) onUpdate(f.id, { notaContato: e.target.value }); }}
+              style={{ fontSize: 12, padding: "6px 8px", borderRadius: 8, border: "1px solid #E3DACB", background: "#FBF8F2" }}
+            />
+          </div>
+        )}
+        <button
+          onClick={() => alternarHistorico(f)}
+          style={{ background: "none", border: "none", color: "#918567", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: 0, marginTop: 8, textAlign: "left" }}
+        >
+          {historico[f.id] ? "Ocultar histórico do WhatsApp" : "Ver histórico do WhatsApp"}
+        </button>
+        {historico[f.id] === "carregando" && (
+          <div style={{ fontSize: 11, color: "#C9BFAE", marginTop: 4 }}>Carregando...</div>
+        )}
+        {Array.isArray(historico[f.id]) && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6, maxHeight: 160, overflowY: "auto" }}>
+            {historico[f.id].length === 0 && <div style={{ fontSize: 11, color: "#C9BFAE" }}>Nenhuma conversa registrada ainda.</div>}
+            {historico[f.id].map((log) => (
+              <div key={log.id} style={{ fontSize: 11, background: "#FBF8F2", borderRadius: 6, padding: "5px 7px" }}>
+                <div style={{ color: "#9C9284", fontWeight: 600 }}>
+                  {log.de === "sistema" ? "Você/sistema" : "Paciente"} · {new Date(log.criado_em).toLocaleString("pt-BR")}
+                </div>
+                <div style={{ color: "#6E6355" }}>{log.resposta_enviada || log.mensagem_recebida}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div>
@@ -3401,79 +3563,55 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
           </div>
         }
       />
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        {[
-          { id: "atrasadas", label: "Consultas atrasadas", count: contagemAtrasadas },
-          { id: "prospeccao", label: "Prospecção", count: contagemProspeccao }
-        ].map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setAba(t.id)}
-            style={{
-              padding: "8px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer",
-              border: `1px solid ${aba === t.id ? "#867A6E" : "#E3DACB"}`,
-              background: aba === t.id ? "#867A6E" : "#FFFFFF",
-              color: aba === t.id ? "#FFFFFF" : "#6E6355"
-            }}
-          >
-            {t.label} ({t.count})
-          </button>
-        ))}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          {[
+            { id: "atrasadas", label: "Consultas atrasadas", count: contagemAtrasadas },
+            { id: "prospeccao", label: "Prospecção", count: contagemProspeccao }
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setAba(t.id)}
+              style={{
+                padding: "8px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                border: `1px solid ${aba === t.id ? "#867A6E" : "#E3DACB"}`,
+                background: aba === t.id ? "#867A6E" : "#FFFFFF",
+                color: aba === t.id ? "#FFFFFF" : "#6E6355"
+              }}
+            >
+              {t.label} ({t.count})
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#6E6355" }}>
+          Ordenar por:
+          <select value={ordenacao} onChange={(e) => setOrdenacao(e.target.value)} style={styles.kanbanSelect}>
+            <option value="padrao">Prioridade</option>
+            <option value="nome">Ordem alfabética</option>
+            <option value="contato">Data da última conversa</option>
+            <option value="idade">Idade</option>
+          </select>
+        </div>
       </div>
       <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 8 }}>
-        {KANBAN_COLS.map((col) => {
-          const items = followupsFiltrados.filter((f) => f.coluna === col.id);
-          return (
-            <div key={col.id} style={styles.kanbanCol} className="kanban-col">
-              <div style={styles.kanbanColHeader}>
-                {col.label} <span style={{ color: "#9C9284", fontWeight: 400 }}>({items.length})</span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {items.map((f) => {
-                  const paciente = patientOf(f.pacienteId);
-                  const linkWpp = paciente ? linkWhatsApp(paciente.whatsapp || paciente.telefone, f.mensagemSugerida || mensagemPara(f, paciente)) : null;
-                  return (
-                    <div key={f.id} style={styles.kanbanCard}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#867A6E" }}>{f.titulo}</div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: 8, background: PRIORIDADE_COLOR[f.prioridade], marginTop: 4 }} />
-                          <button
-                            title="Excluir follow-up"
-                            onClick={() => { if (window.confirm("Excluir este follow-up? Essa ação não pode ser desfeita.")) onDelete(f.id); }}
-                            style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", padding: 0, display: "flex" }}
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </div>
-                      <div style={{ fontSize: 12, color: "#9C9284", marginTop: 4 }}>{patientName(f.pacienteId)}</div>
-                      <div style={{ fontSize: 11, color: "#9C9284", marginTop: 6 }}>
-                        Prazo {formatData(f.prazo)} · {f.responsavel}
-                      </div>
-                      {linkWpp && (
-                        <a
-                          href={linkWpp} target="_blank" rel="noopener noreferrer"
-                          style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, color: "#918567", fontWeight: 600, textDecoration: "none" }}
-                        >
-                          <MessageCircle size={13} /> {f.tipo === "Consulta atrasada" ? "Cobrar retorno por WhatsApp" : "Reativar por WhatsApp"}
-                        </a>
-                      )}
-                      <select
-                        value={f.coluna}
-                        onChange={(e) => onMove(f.id, e.target.value)}
-                        style={styles.kanbanSelect}
-                      >
-                        {KANBAN_COLS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                      </select>
-                    </div>
-                  );
-                })}
-                {items.length === 0 && <div style={{ fontSize: 12, color: "#C9BFAE", padding: "8px 0" }}>Sem tarefas</div>}
-              </div>
-            </div>
-          );
-        })}
+        <div style={styles.kanbanCol} className="kanban-col">
+          <div style={styles.kanbanColHeader}>
+            Ainda não conversei <span style={{ color: "#9C9284", fontWeight: 400 }}>({aindaNaoConversou.length})</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {aindaNaoConversou.map(renderCard)}
+            {aindaNaoConversou.length === 0 && <div style={{ fontSize: 12, color: "#C9BFAE", padding: "8px 0" }}>Sem tarefas</div>}
+          </div>
+        </div>
+        <div style={styles.kanbanCol} className="kanban-col">
+          <div style={styles.kanbanColHeader}>
+            Já conversei <span style={{ color: "#9C9284", fontWeight: 400 }}>({jaConversou.length})</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {jaConversou.map(renderCard)}
+            {jaConversou.length === 0 && <div style={{ fontSize: 12, color: "#C9BFAE", padding: "8px 0" }}>Sem conversas ainda</div>}
+          </div>
+        </div>
       </div>
 
       {showModal && (
@@ -3514,7 +3652,7 @@ function FollowupModal({ patients, onClose, onSave }) {
             value={PRIORIDADE_LABEL[form.prioridade]}
             onChange={(label) => set("prioridade", Object.keys(PRIORIDADE_LABEL).find((k) => PRIORIDADE_LABEL[k] === label))} />
           <Field label="Responsável" value={form.responsavel} onChange={(v) => set("responsavel", v)} />
-          <Field label="Coluna" type="select" options={KANBAN_COLS.map((c) => c.label)}
+          <Field label="Status" type="select" options={KANBAN_COLS.map((c) => c.label)}
             value={KANBAN_COLS.find((c) => c.id === form.coluna)?.label || ""}
             onChange={(label) => set("coluna", KANBAN_COLS.find((c) => c.label === label)?.id)} />
         </div>
