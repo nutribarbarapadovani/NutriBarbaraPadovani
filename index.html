@@ -910,6 +910,7 @@ function App() {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [filtroPacientesInicial, setFiltroPacientesInicial] = useState("todos");
+  const [followupsAbaInicial, setFollowupsAbaInicial] = useState("clientes");
   const [loaded, setLoaded] = useState(false);
   const [showNewPatient, setShowNewPatient] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -1996,10 +1997,10 @@ function App() {
         <Header query={query} setQuery={setQuery} onMenuClick={() => setMobileNavOpen(true)} />
       <SyncBanner syncLog={syncLog} onVerDetalhes={() => setView("integracoes")} />
         <div style={styles.content} className="content">
-          {view === "dashboard" && <Dashboard patients={patients} followups={followups} setView={setView} setSelectedId={setSelectedId} setFiltroPacientesInicial={setFiltroPacientesInicial} />}
+          {view === "dashboard" && <Dashboard patients={patients} followups={followups} setView={setView} setSelectedId={setSelectedId} setFiltroPacientesInicial={setFiltroPacientesInicial} setFollowupsAbaInicial={setFollowupsAbaInicial} />}
           {view === "patients" && <PatientsList patients={filteredPatients} events={events} onOpen={(id) => setSelectedId(id)} onNew={() => setShowNewPatient(true)} onQuickConsulta={registrarConsultaHoje} onExportar={exportarPacientesExcel} onImportar={importarPacientesExcel} filtroInicial={filtroPacientesInicial} />}
           {view === "agenda" && <Agenda patients={patients} events={events} onAdd={addEvent} onUpdate={updateEvent} onDelete={deleteEvent} onOpen={(id) => setSelectedId(id)} />}
-          {view === "followups" && <FollowupsBoard followups={followups} patients={patients} onMove={moveFollowup} onAdd={addFollowup} onDelete={deleteFollowup} onCriarProspeccao={criarFollowupsProspeccao} onOpen={(id) => setSelectedId(id)} />}
+          {view === "followups" && <FollowupsBoard followups={followups} patients={patients} onMove={moveFollowup} onAdd={addFollowup} onDelete={deleteFollowup} onCriarProspeccao={criarFollowupsProspeccao} onOpen={(id) => setSelectedId(id)} abaInicial={followupsAbaInicial} />}
           {view === "financeiro" && <Financeiro patients={patients} onAddPagamento={addPagamento} onOpen={(id) => setSelectedId(id)} />}
           {view === "appContent" && <AppContent items={contentItems} onSave={salvarConteudo} onDelete={excluirConteudo} onTogglePublish={alternarPublicacao} onRestaurarVersao={restaurarVersaoConteudo} />}
           {view === "biblioteca" && <BibliotecaMateriais items={materiais} patients={patients} onSave={salvarMaterial} onDelete={excluirMaterial} onOpenPatient={(id) => setSelectedId(id)} />}
@@ -2553,7 +2554,7 @@ function BibliotecaMateriais({ items, patients, onSave, onDelete, onOpenPatient 
 /* ---------------------------------------------------------
    Dashboard
 --------------------------------------------------------- */
-function Dashboard({ patients, followups, setView, setSelectedId, setFiltroPacientesInicial }) {
+function Dashboard({ patients, followups, setView, setSelectedId, setFiltroPacientesInicial, setFollowupsAbaInicial }) {
   const [ordenacaoSemContato, setOrdenacaoSemContato] = useState("dias");
   const ativos = patients.filter((p) => p.status === "ativo").length;
   const pausa = patients.filter((p) => p.status === "pausa").length;
@@ -2575,7 +2576,10 @@ function Dashboard({ patients, followups, setView, setSelectedId, setFiltroPacie
     return d !== null && d >= 21 && p.status === "ativo";
   });
 
-  const followupsPendentes = followups.filter((f) => f.coluna !== "concluido").length;
+  const statusDoPaciente = (id) => patients.find((p) => p.id === id)?.status;
+  const followupsPendentesLista = followups.filter((f) => f.coluna !== "concluido");
+  const followupsPendentesProspeccao = followupsPendentesLista.filter((f) => statusDoPaciente(f.pacienteId) === "prospect").length;
+  const followupsPendentesClientes = followupsPendentesLista.length - followupsPendentesProspeccao;
 
   const aniversariantes = patients.filter((p) => {
     if (!p.dataNascimento) return false;
@@ -2631,8 +2635,10 @@ function Dashboard({ patients, followups, setView, setSelectedId, setFiltroPacie
         <MetricCard label="Em prospecção" value={prospeccao} icon={MessageCircle} accent="#A99790"
           onClick={() => { setFiltroPacientesInicial("prospect"); setView("patients"); }} />
         <MetricCard label="Taxa de conversão (geral)" value={`${taxaConversao}%`} icon={TrendingUp} accent="#918567" />
-        <MetricCard label="Follow-ups pendentes" value={followupsPendentes} icon={MessageCircle} accent="#A99790"
-          onClick={() => setView("followups")} />
+        <MetricCard label="Follow-ups de clientes" value={followupsPendentesClientes} icon={CheckSquare} accent="#918567"
+          onClick={() => { setFollowupsAbaInicial("clientes"); setView("followups"); }} />
+        <MetricCard label="Follow-ups de prospecção" value={followupsPendentesProspeccao} icon={MessageCircle} accent="#A99790"
+          onClick={() => { setFollowupsAbaInicial("prospeccao"); setView("followups"); }} />
         <MetricCard label="Receita prevista" value={formatMoeda(receitaPrevista)} icon={DollarSign} accent="#867A6E"
           onClick={() => setView("financeiro")} />
         <MetricCard label="Receita recebida" value={formatMoeda(receitaRecebida)} icon={TrendingUp} accent="#918567"
@@ -4617,10 +4623,15 @@ function EventModal({ patients, event, onClose, onSave }) {
   );
 }
 
-function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarProspeccao, onOpen }) {
+function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarProspeccao, onOpen, abaInicial }) {
   const hojeFollowup = new Date().toISOString().slice(0, 10);
   const [showModal, setShowModal] = useState(false);
-  const [aba, setAba] = useState("atrasadas");
+  // Duas listas separadas: "clientes" (pacientes ativos, inativos ou com alta) e
+  // "prospeccao" (quem ainda não fechou). A separação segue o status atual da pessoa,
+  // então quando uma prospecção fecha acompanhamento, os follow-ups dela passam
+  // automaticamente para a aba Clientes.
+  const [aba, setAba] = useState(abaInicial === "prospeccao" ? "prospeccao" : "clientes");
+  useEffect(() => { if (abaInicial) setAba(abaInicial === "prospeccao" ? "prospeccao" : "clientes"); }, [abaInicial]);
   const patientOf = (id) => patients.find((p) => p.id === id);
   const patientName = (id) => patientOf(id)?.nome || "—";
   const mensagemReativacao = (p) =>
@@ -4629,12 +4640,12 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
     `Oiê ${p?.responsavel || ""}! Passando para saber se conseguiu pensar em um horário para o retorno da ${p?.nome || ""}. Qualquer horário, me avisa! 💛`;
   const mensagemPara = (f, p) => (f.tipo === "Consulta atrasada" ? mensagemConsultaAtrasada(p) : mensagemReativacao(p));
 
-  const contagemProspeccao = followups.filter((f) => patientOf(f.pacienteId)?.status === "prospect").length;
-  const contagemAtrasadas = followups.length - contagemProspeccao;
-  const followupsFiltrados = followups.filter((f) => {
-    const ehProspeccao = patientOf(f.pacienteId)?.status === "prospect";
-    return aba === "prospeccao" ? ehProspeccao : !ehProspeccao;
-  });
+  const ehDeProspeccao = (f) => patientOf(f.pacienteId)?.status === "prospect";
+  const pendente = (f) => f.coluna !== "concluido";
+  const contagemProspeccao = followups.filter((f) => ehDeProspeccao(f) && pendente(f)).length;
+  const contagemClientes = followups.filter((f) => !ehDeProspeccao(f) && pendente(f)).length;
+  const followupsFiltrados = followups.filter((f) => (aba === "prospeccao" ? ehDeProspeccao(f) : !ehDeProspeccao(f)));
+  const pacientesDaAba = patients.filter((p) => (aba === "prospeccao" ? p.status === "prospect" : p.status !== "prospect"));
 
   return (
     <div>
@@ -4654,7 +4665,7 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
       />
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         {[
-          { id: "atrasadas", label: "Consultas atrasadas", count: contagemAtrasadas },
+          { id: "clientes", label: "Clientes", count: contagemClientes },
           { id: "prospeccao", label: "Prospecção", count: contagemProspeccao }
         ].map((t) => (
           <button
@@ -4667,9 +4678,14 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
               color: aba === t.id ? "#FFFFFF" : "#6E6355"
             }}
           >
-            {t.label} ({t.count})
+            {t.label} ({t.count} pendente{t.count === 1 ? "" : "s"})
           </button>
         ))}
+      </div>
+      <div style={{ fontSize: 12, color: "#9C9284", marginTop: -8, marginBottom: 14 }}>
+        {aba === "prospeccao"
+          ? "Pessoas que ainda não fecharam acompanhamento. Ao fechar, os follow-ups delas passam para Clientes automaticamente."
+          : "Pacientes ativos, inativos ou que receberam alta: retornos, cobranças e relacionamento."}
       </div>
       <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 8 }}>
         {KANBAN_COLS.map((col) => {
@@ -4740,7 +4756,8 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
 
       {showModal && (
         <FollowupModal
-          patients={patients}
+          patients={pacientesDaAba}
+          tipoPadrao={aba === "prospeccao" ? "Fazer follow-up" : "Cobrar retorno"}
           onClose={() => setShowModal(false)}
           onSave={(f) => { onAdd(f); setShowModal(false); }}
         />
@@ -4749,9 +4766,9 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
   );
 }
 
-function FollowupModal({ patients, onClose, onSave }) {
+function FollowupModal({ patients, onClose, onSave, tipoPadrao }) {
   const [form, setForm] = useState({
-    pacienteId: "", titulo: "", tipo: "Cobrar retorno", prioridade: "media",
+    pacienteId: "", titulo: "", tipo: tipoPadrao || "Cobrar retorno", prioridade: "media",
     prazo: new Date().toISOString().slice(0, 10), coluna: "afazer", responsavel: "Nutricionista"
   });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
