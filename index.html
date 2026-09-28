@@ -786,7 +786,7 @@ function App() {
       if (p.status !== "prospect") return;
       const dias = diasDesde(p.ultimoContato);
       if (dias === null || dias < 30) return;
-      const jaTem = followups.some((f) => f.pacienteId === p.id && f.coluna !== "concluido" && f.tipo === "Reativação de prospecção");
+      const jaTem = followups.some((f) => f.pacienteId === p.id && f.coluna !== "concluido");
       if (jaTem) return;
       addFollowup({
         pacienteId: p.id,
@@ -808,7 +808,7 @@ function App() {
       if (!p.proximaConsultaPrevista) return;
       const diasAtraso = diasDesde(p.proximaConsultaPrevista);
       if (diasAtraso === null || diasAtraso < 7) return;
-      const jaTem = followups.some((f) => f.pacienteId === p.id && f.coluna !== "concluido" && f.tipo === "Consulta atrasada");
+      const jaTem = followups.some((f) => f.pacienteId === p.id && f.coluna !== "concluido");
       if (jaTem) return;
       addFollowup({
         pacienteId: p.id,
