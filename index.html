@@ -805,14 +805,14 @@ function App() {
     const hoje = new Date().toISOString().slice(0, 10);
     patients.forEach((p) => {
       if (p.status !== "ativo") return;
-      if (!p.proximaConsultaPrevista) return;
+      const semData = !p.proximaConsultaPrevista;
       const diasAtraso = diasDesde(p.proximaConsultaPrevista);
-      if (diasAtraso === null || diasAtraso < 7) return;
+      if (!semData && (diasAtraso === null || diasAtraso < 7)) return;
       const jaTem = followups.some((f) => f.pacienteId === p.id && f.coluna !== "concluido");
       if (jaTem) return;
       addFollowup({
         pacienteId: p.id,
-        titulo: `Consulta atrasada — ${p.nome}`,
+        titulo: semData ? `Sem próxima consulta agendada — ${p.nome}` : `Consulta atrasada — ${p.nome}`,
         tipo: "Consulta atrasada",
         prioridade: "alta",
         prazo: hoje,
