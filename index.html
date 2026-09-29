@@ -795,7 +795,7 @@ function App() {
       if (jaTem) return;
       addFollowup({
         pacienteId: p.id,
-        titulo: `Reativação — ${p.nome}`,
+        titulo: `Reativação de ${p.nome}`,
         tipo: "Reativação de prospecção",
         prioridade: "media",
         prazo: hoje,
@@ -817,7 +817,7 @@ function App() {
       if (jaTem) return;
       addFollowup({
         pacienteId: p.id,
-        titulo: semData ? `Sem próxima consulta agendada — ${p.nome}` : `Consulta atrasada — ${p.nome}`,
+        titulo: semData ? `Sem próxima consulta agendada de ${p.nome}` : `Consulta atrasada de ${p.nome}`,
         tipo: "Consulta atrasada",
         prioridade: "alta",
         prazo: hoje,
@@ -1251,7 +1251,10 @@ function App() {
     if ("notaContato" in patch) rowPatch.nota_contato = patch.notaContato || "";
     if ("coluna" in patch) rowPatch.coluna = patch.coluna;
     supabaseClient.from("followups").update(rowPatch).eq("id", id)
-      .then(() => {}).catch((e) => console.error("Falha ao atualizar follow-up:", e));
+      .then(({ error }) => {
+        if (error) logSync(`Não consegui salvar o follow-up no banco (rode a migração de colunas mais recente): ${error.message}`, false);
+      })
+      .catch((e) => logSync(`Falha ao atualizar follow-up: ${e.message}`, false));
   };
 
   const addFollowup = (followup) => {
@@ -1291,7 +1294,7 @@ function App() {
     let criados = 0;
     pendentes.forEach((p) => {
       addFollowup({
-        pacienteId: p.id, titulo: `Follow-up de prospecção — ${p.nome}`, tipo: "Fazer follow-up",
+        pacienteId: p.id, titulo: `Follow-up de prospecção de ${p.nome}`, tipo: "Fazer follow-up",
         prioridade: "media", prazo, coluna: "afazer", responsavel: "Nutricionista"
       });
       criados++;
@@ -2275,7 +2278,8 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
       consultasRealizadas: patient.acompanhamento?.consultasRealizadas || 0,
       valor: patient.acompanhamento?.valor || 0,
       formaPagamento: patient.acompanhamento?.formaPagamento || "Pix",
-      parcelas: patient.acompanhamento?.parcelas || 1
+      parcelas: patient.acompanhamento?.parcelas || 1,
+      ultimoContato: patient.ultimoContato || ""
     });
     setEditandoAcompanhamento(true);
   };
@@ -2283,6 +2287,7 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
   const salvarAcompanhamento = () => {
     onUpdate({
       proximaConsultaPrevista: acompForm.proximaConsultaPrevista,
+      ultimoContato: acompForm.ultimoContato,
       acompanhamento: {
         ...patient.acompanhamento,
         dataInicio: acompForm.dataInicio,
@@ -2993,6 +2998,7 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                     <Field label="Início do acompanhamento" type="date" value={acompForm.dataInicio} onChange={(v) => setAcompForm((f) => ({ ...f, dataInicio: v }))} />
                     <Field label="Fim previsto" type="date" value={acompForm.dataFim} onChange={(v) => setAcompForm((f) => ({ ...f, dataFim: v }))} />
                     <Field label="Próxima consulta prevista" type="date" value={acompForm.proximaConsultaPrevista} onChange={(v) => setAcompForm((f) => ({ ...f, proximaConsultaPrevista: v }))} />
+                    <Field label="Último contato" type="date" value={acompForm.ultimoContato} onChange={(v) => setAcompForm((f) => ({ ...f, ultimoContato: v }))} />
                     <Field label="Consultas realizadas" type="number" value={acompForm.consultasRealizadas} onChange={(v) => setAcompForm((f) => ({ ...f, consultasRealizadas: v }))} />
                     <Field label="Consultas total" type="number" value={acompForm.consultasTotal} onChange={(v) => setAcompForm((f) => ({ ...f, consultasTotal: v }))} />
                     <Field label="Valor total (R$)" type="number" value={acompForm.valor} onChange={(v) => setAcompForm((f) => ({ ...f, valor: v }))} />
