@@ -132,6 +132,7 @@ const Phone = (p) => <SvgIcon {...p}><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 
 const Mail = (p) => <SvgIcon {...p}><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M2 7l8.97 5.7a1.94 1.94 0 002.06 0L22 7" /></SvgIcon>;
 const MapPin = (p) => <SvgIcon {...p}><path d="M20 10c0 5-8 12-8 12s-8-7-8-12a8 8 0 0116 0z" /><circle cx="12" cy="10" r="3" /></SvgIcon>;
 const Baby = (p) => <SvgIcon {...p}><circle cx="12" cy="12" r="8.5" /><path d="M9 10h.01" /><path d="M15 10h.01" /><path d="M9 15a3.5 3.5 0 006 0" /></SvgIcon>;
+const BookOpen = (p) => <SvgIcon {...p}><path d="M12 6.5c-2-1.5-5-2-8-1.5v12c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5v-12c-3-.5-6 0-8 1.5z" /><line x1="12" y1="6.5" x2="12" y2="18.5" /></SvgIcon>;
 
 /* ---------------------------------------------------------
    Utilidades
@@ -319,17 +320,6 @@ const linkWhatsApp = (telefone, mensagem) => {
   return `https://wa.me/${comPais}${texto}`;
 };
 
-let janelaWhatsApp = null;
-const abrirWhatsApp = (e, url) => {
-  if (e) e.preventDefault();
-  if (janelaWhatsApp && !janelaWhatsApp.closed) {
-    janelaWhatsApp.location.href = url;
-    janelaWhatsApp.focus();
-  } else {
-    janelaWhatsApp = window.open(url, "whatsapp_web");
-  }
-};
-
 const linkMapa = (endereco) => {
   if (!endereco || !endereco.trim()) return null;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`;
@@ -444,19 +434,194 @@ const TIPOS_ACOMPANHAMENTO = [
 ];
 const DURACAO_MINIMA_MESES = 1;
 
+/* Programas que existem de fato no app Comê (espelham TIPOS_ACOMPANHAMENTO, exceto "avulso") */
+const APP_PROGRAMAS = TIPOS_ACOMPANHAMENTO.filter((t) => t.id !== "avulso");
+
+const gerarCodigoConvite = (nome) => {
+  const iniciais = (nome || "").trim().split(/\s+/).slice(0, 1)[0]?.slice(0, 3).toUpperCase() || "APP";
+  const numero = Math.floor(1000 + Math.random() * 9000);
+  return `${iniciais}-${numero}`;
+};
+
+function appInviteToRow(inv) {
+  return {
+    id: inv.id,
+    paciente_id: inv.pacienteId,
+    code: inv.code,
+    programas: inv.programas || [],
+    status: inv.status || "gerado",
+    telefone_destino: inv.telefoneDestino || "",
+    expires_at: inv.expiresAt || null,
+    created_at: inv.createdAt || new Date().toISOString(),
+    used_at: inv.usedAt || null
+  };
+}
+function appInviteFromRow(r) {
+  return {
+    id: r.id,
+    pacienteId: r.paciente_id,
+    code: r.code,
+    programas: r.programas || [],
+    status: r.status || "gerado",
+    telefoneDestino: r.telefone_destino || "",
+    expiresAt: r.expires_at || "",
+    createdAt: r.created_at || "",
+    usedAt: r.used_at || ""
+  };
+}
+
+/* ---------------------------------------------------------
+   Conteúdo do app (cortes, guias, receitas, cardápios, rotinas,
+   atividades, lancheira, impressos, complementares)
+--------------------------------------------------------- */
+const CONTEUDO_TIPOS = [
+  { id: "corte", label: "Cortes" },
+  { id: "guia", label: "Guias" },
+  { id: "receita", label: "Receitas" },
+  { id: "cardapio", label: "Cardápios" },
+  { id: "rotina", label: "Rotinas" },
+  { id: "atividade", label: "Atividades" },
+  { id: "lancheira", label: "Lancheira" },
+  { id: "impresso", label: "Impressos" },
+  { id: "complementar", label: "Complementares" }
+];
+const CONTEUDO_STATUS = {
+  aguardando: { label: "Aguardando material", color: "#867A6E", bg: "#EFE6D8" },
+  rascunho: { label: "Rascunho", color: "#867A6E", bg: "#EFE6D8" },
+  revisao: { label: "Em revisão", color: "#B4863F", bg: "#F3E3C7" },
+  publicado: { label: "Publicado", color: "#3D5A40", bg: "#DCE8D8" }
+};
+const DIAS_SEMANA_CARDAPIO = [
+  { id: "seg", label: "Segunda" }, { id: "ter", label: "Terça" }, { id: "qua", label: "Quarta" },
+  { id: "qui", label: "Quinta" }, { id: "sex", label: "Sexta" }, { id: "sab", label: "Sábado" }, { id: "dom", label: "Domingo" }
+];
+const REFEICOES_CARDAPIO = [
+  { id: "cafe", label: "Café da manhã" }, { id: "almoco", label: "Almoço" },
+  { id: "lanche", label: "Lanche" }, { id: "jantar", label: "Jantar" }
+];
+const cardapioVazio = () => ({
+  publicado: false, observacoes: "", atualizadoEm: "", versoes: [],
+  grade: DIAS_SEMANA_CARDAPIO.reduce((acc, d) => {
+    acc[d.id] = REFEICOES_CARDAPIO.reduce((r, ref) => { r[ref.id] = ""; return r; }, {});
+    return acc;
+  }, {})
+});
+function contentToRow(c) {
+  return {
+    id: c.id, tipo: c.tipo, titulo: c.titulo || "", fase: c.fase || null,
+    nivel_minimo: c.nivelMinimo || "gratuito", status: c.status || "aguardando",
+    corpo: c.corpo || "", fontes: c.fontes || "", versoes: c.versoes || [],
+    created_at: c.createdAt || new Date().toISOString(), updated_at: new Date().toISOString()
+  };
+}
+function contentFromRow(r) {
+  return {
+    id: r.id, tipo: r.tipo, titulo: r.titulo || "", fase: r.fase || "",
+    nivelMinimo: r.nivel_minimo || "gratuito", status: r.status || "aguardando",
+    corpo: r.corpo || "", fontes: r.fontes || "", versoes: r.versoes || [],
+    createdAt: r.created_at || "", updatedAt: r.updated_at || ""
+  };
+}
+
+/* ---------------------------------------------------------
+   Biblioteca de materiais (documentos originais da nutricionista:
+   PDFs, imagens e outros arquivos usados no atendimento — distinta
+   do "Conteúdo do app", que é o texto publicado para as mães dentro
+   do aplicativo)
+--------------------------------------------------------- */
+const MATERIAL_CATEGORIAS = [
+  { id: "introducao_alimentar", label: "Introdução Alimentar" },
+  { id: "comportamento_alimentar", label: "Comportamento Alimentar" },
+  { id: "receitas", label: "Receitas" },
+  { id: "lancheira", label: "Lancheira" },
+  { id: "atividades_brincadeiras", label: "Atividades e Brincadeiras" },
+  { id: "personalizado", label: "Materiais Personalizados" },
+  { id: "identidade_comunicacao", label: "Identidade e Comunicação" },
+  { id: "protocolos_referencia", label: "Protocolos e Referências Internas" },
+  { id: "outros", label: "Outros" }
+];
+const MATERIAL_CLASSIFICACAO = {
+  paciente: { label: "Material para paciente", color: "#3D5A40", bg: "#DCE8D8" },
+  interno: { label: "Material interno", color: "#7A4A3D", bg: "#F0DCD3" },
+  referencia: { label: "Material de referência", color: "#3A5A78", bg: "#D8E4EE" },
+  revisar: { label: "A revisar", color: "#B4863F", bg: "#F3E3C7" }
+};
+const MATERIAL_STATUS = {
+  revisao: { label: "Em revisão", color: "#B4863F", bg: "#F3E3C7" },
+  aprovado: { label: "Aprovado", color: "#3D5A40", bg: "#DCE8D8" }
+};
+const MATERIAL_ORIGENS = [
+  { id: "autoral", label: "Autoral (Bárbara)" },
+  { id: "curadoria_terceiros", label: "Curadoria de terceiros" },
+  { id: "personalizado_paciente", label: "Personalizado para paciente" }
+];
+const MOMENTOS_ATENDIMENTO = [
+  { id: "primeiro_atendimento", label: "Primeiro atendimento" },
+  { id: "avaliacao", label: "Avaliação" },
+  { id: "orientacao_alimentar", label: "Orientação alimentar" },
+  { id: "acompanhamento", label: "Acompanhamento" },
+  { id: "dificuldade_especifica", label: "Dificuldade específica" },
+  { id: "pos_consulta", label: "Pós-consulta" }
+];
+function materialToRow(m) {
+  return {
+    id: m.id,
+    titulo: m.titulo || "",
+    categoria: m.categoria || "outros",
+    tipo: m.tipo || "pdf",
+    descricao: m.descricao || "",
+    origem: m.origem || "autoral",
+    finalidade: m.finalidade || "",
+    publico_alvo: m.publicoAlvo || "",
+    classificacao: m.classificacao || "revisar",
+    status: m.status || "revisao",
+    tags: m.tags || [],
+    paciente_id: m.pacienteId || null,
+    momento_atendimento: m.momentoAtendimento || null,
+    arquivo_nome: m.arquivoNome || "",
+    resumo_busca: m.resumoBusca || "",
+    permite_download: m.permiteDownload !== false,
+    permite_envio_paciente: m.permiteEnvioPaciente || false,
+    versoes: m.versoes || [],
+    created_at: m.createdAt || new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+}
+function materialFromRow(r) {
+  return {
+    id: r.id,
+    titulo: r.titulo || "",
+    categoria: r.categoria || "outros",
+    tipo: r.tipo || "pdf",
+    descricao: r.descricao || "",
+    origem: r.origem || "autoral",
+    finalidade: r.finalidade || "",
+    publicoAlvo: r.publico_alvo || "",
+    classificacao: r.classificacao || "revisar",
+    status: r.status || "revisao",
+    tags: r.tags || [],
+    pacienteId: r.paciente_id || "",
+    momentoAtendimento: r.momento_atendimento || "",
+    arquivoNome: r.arquivo_nome || "",
+    resumoBusca: r.resumo_busca || "",
+    permiteDownload: r.permite_download !== false,
+    permiteEnvioPaciente: r.permite_envio_paciente || false,
+    versoes: r.versoes || [],
+    createdAt: r.created_at || "",
+    updatedAt: r.updated_at || ""
+  };
+}
+
 const seedFollowups = () => IMPORTED_FOLLOWUPS;
 
 
 
 const KANBAN_COLS = [
-  { id: "afazer", label: "Pendente" },
+  { id: "afazer", label: "A fazer" },
+  { id: "hoje", label: "Hoje" },
+  { id: "andamento", label: "Em andamento" },
+  { id: "aguardando", label: "Aguardando família" },
   { id: "concluido", label: "Concluído" }
-];
-
-const ETIQUETAS_CONTATO = [
-  { id: "agendado", label: "Agendado", color: "#7C9885" },
-  { id: "a_agendar", label: "A agendar", color: "#C9A24B" },
-  { id: "sem_resposta", label: "Sem resposta", color: "#A99790" }
 ];
 
 const STATUS_LABEL = { ativo: "Ativo", pausa: "Inativo", concluido: "Recebeu alta", prospect: "Prospecção" };
@@ -667,7 +832,8 @@ function patientToRow(p) {
     sessoes: p.sessoes || [],
     exames: p.exames || [],
     marcos_alimentares: p.marcosAlimentares || [],
-    timeline: p.timeline || []
+    timeline: p.timeline || [],
+    app: p.app || { status: "inativo", programas: [] }
   };
 }
 function patientFromRow(r) {
@@ -701,7 +867,8 @@ function patientFromRow(r) {
     sessoes: r.sessoes || [],
     exames: r.exames || [],
     marcosAlimentares: r.marcos_alimentares || [],
-    timeline: r.timeline || []
+    timeline: r.timeline || [],
+    app: r.app || { status: "inativo", programas: [] }
   };
 }
 function eventToRow(e) {
@@ -722,16 +889,14 @@ function followupToRow(f) {
   return {
     id: f.id, paciente_id: f.pacienteId, titulo: f.titulo, tipo: f.tipo || "",
     prioridade: f.prioridade || "media", prazo: f.prazo || null, coluna: f.coluna || "afazer",
-    responsavel: f.responsavel || "Nutricionista", google_event_id: f.googleEventId || null,
-    contatado_em: f.contatadoEm || null, etiqueta_contato: f.etiquetaContato || "", nota_contato: f.notaContato || ""
+    responsavel: f.responsavel || "Nutricionista", google_event_id: f.googleEventId || null
   };
 }
 function followupFromRow(r) {
   return {
     id: r.id, pacienteId: r.paciente_id, titulo: r.titulo, tipo: r.tipo || "",
     prioridade: r.prioridade || "media", prazo: r.prazo || "", coluna: r.coluna || "afazer",
-    responsavel: r.responsavel || "Nutricionista", googleEventId: r.google_event_id || undefined,
-    contatadoEm: r.contatado_em || "", etiquetaContato: r.etiqueta_contato || "", notaContato: r.nota_contato || ""
+    responsavel: r.responsavel || "Nutricionista", googleEventId: r.google_event_id || undefined
   };
 }
 
@@ -745,11 +910,14 @@ function App() {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [filtroPacientesInicial, setFiltroPacientesInicial] = useState("todos");
+  const [followupsAbaInicial, setFollowupsAbaInicial] = useState("clientes");
   const [loaded, setLoaded] = useState(false);
   const [showNewPatient, setShowNewPatient] = useState(false);
-  const [novoPacienteProspeccao, setNovoPacienteProspeccao] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [events, setEvents] = useState([]);
+  const [appInvites, setAppInvites] = useState([]);
+  const [contentItems, setContentItems] = useState([]);
+  const [materiais, setMateriais] = useState([]);
 
   useEffect(() => {
     if (query.trim() && view !== "patients") {
@@ -763,37 +931,68 @@ function App() {
   const [googleToken, setGoogleToken] = useState(null);
   const [gisReady, setGisReady] = useState(false);
   const [syncLog, setSyncLog] = useState([]);
+  const [erroCarregamento, setErroCarregamento] = useState(false);
   const tokenClientRef = useRef(null);
 
-  useEffect(() => {
+  const carregarDados = () => {
+    setErroCarregamento(false);
     (async () => {
       try {
-        const [pacientesRes, eventosRes, followupsRes, settingsRes] = await Promise.all([
+        const [pacientesRes, eventosRes, followupsRes, settingsRes, appInvitesRes, appContentRes] = await Promise.all([
           supabaseClient.from("patients").select("*"),
           supabaseClient.from("events").select("*"),
           supabaseClient.from("followups").select("*"),
-          supabaseClient.from("app_settings").select("*")
+          supabaseClient.from("app_settings").select("*"),
+          supabaseClient.from("app_invites").select("*"),
+          supabaseClient.from("app_content").select("*")
         ]);
+        const respostas = {
+          pacientes: pacientesRes, eventos: eventosRes, followups: followupsRes,
+          settings: settingsRes, appInvites: appInvitesRes, appContent: appContentRes
+        };
+        const comErro = Object.entries(respostas).find(([, r]) => r && r.error);
+        if (comErro) {
+          throw new Error("Falha ao carregar '" + comErro[0] + "': " + comErro[1].error.message);
+        }
         setPatients((pacientesRes.data || []).map(patientFromRow));
         setEvents((eventosRes.data || []).map(eventFromRow));
         setFollowups((followupsRes.data || []).map(followupFromRow));
+        setAppInvites((appInvitesRes.data || []).map(appInviteFromRow));
+        setContentItems((appContentRes.data || []).map(contentFromRow));
+        // Biblioteca de materiais: tabela nova (ver migração SQL). Falha isolada aqui
+        // (ex.: migração ainda não aplicada) não deve travar o resto do CRM — só a
+        // aba fica vazia até a tabela existir, com aviso no sino de sincronização.
+        try {
+          const materiaisRes = await supabaseClient.from("biblioteca_materiais").select("*");
+          if (materiaisRes.error) throw materiaisRes.error;
+          setMateriais((materiaisRes.data || []).map(materialFromRow));
+        } catch (eMat) {
+          console.error("Falha ao carregar biblioteca de materiais:", eMat);
+          logSync("A Biblioteca de materiais não carregou (é provável que a tabela 'biblioteca_materiais' ainda não exista — rode a migração SQL mais recente).", false);
+        }
         const settingsMap = {};
         (settingsRes.data || []).forEach((s) => { settingsMap[s.chave] = s.valor; });
         setGoogleClientId(settingsMap.googleClientId || "");
         setContratosModelo(settingsMap.contratosModelo ? JSON.parse(settingsMap.contratosModelo) : CONTRATOS_PADRAO);
+        setLoaded(true);
       } catch (e) {
         console.error("Falha ao carregar do Supabase:", e);
+        setErroCarregamento(true);
       }
-      setLoaded(true);
     })();
-  }, []);
+  };
+
+  useEffect(() => { carregarDados(); }, []);
 
   useEffect(() => {
     if (!loaded) return;
     supabaseClient.from("app_settings").upsert([
       { chave: "googleClientId", valor: googleClientId },
       { chave: "contratosModelo", valor: JSON.stringify(contratosModelo) }
-    ]).then(() => {}).catch((e) => console.error("Falha ao salvar configurações:", e));
+    ]).then(() => {}).catch((e) => {
+      console.error("Falha ao salvar configurações:", e);
+      logSync("Não foi possível salvar as configurações (modelos de termo ou integração com Google). Tente novamente.", false);
+    });
   }, [googleClientId, contratosModelo, loaded]);
 
   useEffect(() => {
@@ -803,11 +1002,11 @@ function App() {
       if (p.status !== "prospect") return;
       const dias = diasDesde(p.ultimoContato);
       if (dias === null || dias < 30) return;
-      const jaTem = followups.some((f) => f.pacienteId === p.id && f.coluna !== "concluido");
+      const jaTem = followups.some((f) => f.pacienteId === p.id && f.coluna !== "concluido" && f.tipo === "Reativação de prospecção");
       if (jaTem) return;
       addFollowup({
         pacienteId: p.id,
-        titulo: `Reativação de ${p.nome}`,
+        titulo: `Reativação — ${p.nome}`,
         tipo: "Reativação de prospecção",
         prioridade: "media",
         prazo: hoje,
@@ -822,14 +1021,14 @@ function App() {
     const hoje = new Date().toISOString().slice(0, 10);
     patients.forEach((p) => {
       if (p.status !== "ativo") return;
-      const semData = !p.proximaConsultaPrevista;
+      if (!p.proximaConsultaPrevista) return;
       const diasAtraso = diasDesde(p.proximaConsultaPrevista);
-      if (!semData && (diasAtraso === null || diasAtraso < 7)) return;
-      const jaTem = followups.some((f) => f.pacienteId === p.id && f.coluna !== "concluido");
+      if (diasAtraso === null || diasAtraso < 7) return;
+      const jaTem = followups.some((f) => f.pacienteId === p.id && f.coluna !== "concluido" && f.tipo === "Consulta atrasada");
       if (jaTem) return;
       addFollowup({
         pacienteId: p.id,
-        titulo: semData ? `Sem próxima consulta agendada de ${p.nome}` : `Consulta atrasada de ${p.nome}`,
+        titulo: `Consulta atrasada — ${p.nome}`,
         tipo: "Consulta atrasada",
         prioridade: "alta",
         prazo: hoje,
@@ -903,7 +1102,11 @@ function App() {
       const pacienteAtualizado = atualizado.find((p) => p.id === id);
       if (pacienteAtualizado) {
         supabaseClient.from("patients").update(patientToRow(pacienteAtualizado)).eq("id", id)
-          .then(() => {}).catch((e) => console.error("Falha ao salvar paciente:", e));
+          .then(() => {})
+          .catch((e) => {
+            console.error("Falha ao salvar paciente:", e);
+            logSync(`Não foi possível salvar as alterações de ${pacienteAtualizado.nome}. Verifique sua conexão e tente de novo.`, false);
+          });
       }
       return atualizado;
     });
@@ -912,13 +1115,21 @@ function App() {
     const novo = { ...patient, id: uid() };
     setPatients((prev) => [novo, ...prev]);
     supabaseClient.from("patients").insert(patientToRow(novo))
-      .then(() => {}).catch((e) => console.error("Falha ao criar paciente:", e));
+      .then(() => {})
+      .catch((e) => {
+        console.error("Falha ao criar paciente:", e);
+        logSync(`Não foi possível salvar ${novo.nome} no banco de dados. Ele está visível aqui, mas pode sumir ao recarregar a página — tente novamente.`, false);
+      });
   };
   const nomeDoPaciente = (pacienteId) => patients.find((p) => p.id === pacienteId)?.nome || "Paciente";
 
   const persistirPaciente = (paciente) => {
     supabaseClient.from("patients").update(patientToRow(paciente)).eq("id", paciente.id)
-      .then(() => {}).catch((e) => console.error("Falha ao salvar paciente:", e));
+      .then(() => {})
+      .catch((e) => {
+        console.error("Falha ao salvar paciente:", e);
+        logSync(`Não foi possível salvar as alterações de ${paciente.nome}. Verifique sua conexão e tente de novo.`, false);
+      });
   };
 
   const mutarPaciente = (id, transformFn) => {
@@ -1197,7 +1408,11 @@ function App() {
       if (novosPacientes.length > 0) {
         setPatients((prev) => [...prev, ...novosPacientes]);
         supabaseClient.from("patients").insert(novosPacientes.map(patientToRow))
-          .then(() => {}).catch((e) => console.error("Falha ao importar pacientes:", e));
+          .then(() => {})
+          .catch((e) => {
+            console.error("Falha ao importar pacientes:", e);
+            logSync(`${novosPacientes.length} paciente(s) novo(s) apareceram na tela, mas não foram salvos no banco de dados. Tente importar de novo.`, false);
+          });
       }
       if (atualizacoes.length > 0) {
         setPatients((prev) => {
@@ -1215,7 +1430,11 @@ function App() {
       if (novosEventos.length > 0) {
         setEvents((prev) => [...novosEventos, ...prev]);
         supabaseClient.from("events").insert(novosEventos.map(eventToRow))
-          .then(() => {}).catch((e) => console.error("Falha ao importar eventos:", e));
+          .then(() => {})
+          .catch((e) => {
+            console.error("Falha ao importar eventos:", e);
+            logSync("Os agendamentos importados não foram salvos no banco de dados.", false);
+          });
       }
 
       logSync(`Importação concluída: ${novosPacientes.length} novo(s), ${atualizacoes.length} atualizado(s).`);
@@ -1237,8 +1456,11 @@ function App() {
     setSelectedId(null);
     // Eventos e follow-ups do paciente são removidos automaticamente no banco (cascade)
     supabaseClient.from("patients").delete().eq("id", id)
-      .then(() => {}).catch((e) => console.error("Falha ao excluir paciente:", e));
-    logSync("Paciente excluído do CRM.");
+      .then(() => logSync("Paciente excluído do banco de dados."))
+      .catch((e) => {
+        console.error("Falha ao excluir paciente:", e);
+        logSync("A paciente foi removida da tela, mas a exclusão pode não ter sido salva no banco de dados. Verifique em Integrações.", false);
+      });
   };
 
   const moveFollowup = (id, coluna) => {
@@ -1253,20 +1475,6 @@ function App() {
           .catch((err) => logSync(err.message, false));
       }
     }
-  };
-
-  const atualizarFollowup = (id, patch) => {
-    setFollowups((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
-    const rowPatch = {};
-    if ("contatadoEm" in patch) rowPatch.contatado_em = patch.contatadoEm || null;
-    if ("etiquetaContato" in patch) rowPatch.etiqueta_contato = patch.etiquetaContato || "";
-    if ("notaContato" in patch) rowPatch.nota_contato = patch.notaContato || "";
-    if ("coluna" in patch) rowPatch.coluna = patch.coluna;
-    supabaseClient.from("followups").update(rowPatch).eq("id", id)
-      .then(({ error }) => {
-        if (error) logSync(`Não consegui salvar o follow-up no banco (rode a migração de colunas mais recente): ${error.message}`, false);
-      })
-      .catch((e) => logSync(`Falha ao atualizar follow-up: ${e.message}`, false));
   };
 
   const addFollowup = (followup) => {
@@ -1306,7 +1514,7 @@ function App() {
     let criados = 0;
     pendentes.forEach((p) => {
       addFollowup({
-        pacienteId: p.id, titulo: `Follow-up de prospecção de ${p.nome}`, tipo: "Fazer follow-up",
+        pacienteId: p.id, titulo: `Follow-up de prospecção — ${p.nome}`, tipo: "Fazer follow-up",
         prioridade: "media", prazo, coluna: "afazer", responsavel: "Nutricionista"
       });
       criados++;
@@ -1465,21 +1673,6 @@ function App() {
     logSync(`${atualizados} paciente(s) classificado(s) automaticamente. ${semIdade} sem idade cadastrada (não foi possível sugerir).`);
   };
 
-  const resetarBaseDados = () => {
-    const confirmado = window.confirm(
-      "Isso vai substituir todos os pacientes, agenda e follow-ups pelos dados originais deste arquivo, apagando qualquer edição feita depois da última atualização (novos pagamentos, consultas registradas, follow-ups criados, etc.). Deseja continuar?"
-    );
-    if (!confirmado) return;
-    const p = seedPatients();
-    setPatients(p);
-    setFollowups(seedFollowups(p));
-    setEvents(seedEvents(p));
-    supabaseClient.from("events").delete().neq("id", "").then(() => {}).catch((e) => console.error("Falha ao limpar eventos:", e));
-    supabaseClient.from("followups").delete().neq("id", "").then(() => {}).catch((e) => console.error("Falha ao limpar follow-ups:", e));
-    supabaseClient.from("patients").delete().neq("id", "").then(() => {}).catch((e) => console.error("Falha ao limpar pacientes:", e));
-    logSync("Base de dados recarregada a partir do arquivo.");
-  };
-
   const registrarConsultaHoje = (id) => {
     const hoje = new Date().toISOString().slice(0, 10);
     setPatients((prev) => prev.map((p) => {
@@ -1584,6 +1777,175 @@ function App() {
     mutarPaciente(id, (p) => ({ ...p, planoAcao }));
   };
 
+  const toggleAppPrograma = (id, programaId) => {
+    mutarPaciente(id, (p) => {
+      const atuais = p.app?.programas || [];
+      const programas = atuais.includes(programaId)
+        ? atuais.filter((x) => x !== programaId)
+        : [...atuais, programaId];
+      return { ...p, app: { ...(p.app || {}), status: p.app?.status || "inativo", programas } };
+    });
+  };
+
+  const setAppStatus = (id, status, motivo) => {
+    mutarPaciente(id, (p) => ({
+      ...p,
+      app: { ...(p.app || {}), status, motivoRevogacao: status === "revogado" ? (motivo || "") : "" }
+    }));
+  };
+
+  const salvarCardapio = (id, cardapio, publicar) => {
+    mutarPaciente(id, (p) => {
+      const anterior = p.app?.cardapio;
+      const mudou = anterior && (JSON.stringify(anterior.grade) !== JSON.stringify(cardapio.grade) || anterior.observacoes !== cardapio.observacoes);
+      const versoes = mudou
+        ? [{ grade: anterior.grade, observacoes: anterior.observacoes, salvoEm: anterior.atualizadoEm || new Date().toISOString() }, ...(anterior.versoes || [])].slice(0, 5)
+        : (anterior?.versoes || []);
+      return {
+        ...p,
+        app: {
+          ...(p.app || {}),
+          cardapio: { ...cardapio, versoes, publicado: publicar ? true : (anterior?.publicado || false), atualizadoEm: new Date().toISOString() }
+        }
+      };
+    });
+  };
+
+  const restaurarVersaoCardapio = (id, versao) => {
+    mutarPaciente(id, (p) => {
+      const atual = p.app?.cardapio || cardapioVazio();
+      const versoes = [{ grade: atual.grade, observacoes: atual.observacoes, salvoEm: atual.atualizadoEm || new Date().toISOString() }, ...(atual.versoes || [])].slice(0, 5);
+      return {
+        ...p,
+        app: {
+          ...(p.app || {}),
+          cardapio: { ...atual, grade: versao.grade, observacoes: versao.observacoes, versoes, atualizadoEm: new Date().toISOString() }
+        }
+      };
+    });
+  };
+
+  const gerarConvite = (pacienteId, programas) => {
+    const paciente = patients.find((p) => p.id === pacienteId);
+    const novo = {
+      id: uid(),
+      pacienteId,
+      code: gerarCodigoConvite(paciente?.nome),
+      programas,
+      status: "gerado",
+      telefoneDestino: paciente?.whatsapp || paciente?.telefone || "",
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    };
+    setAppInvites((prev) => [
+      novo,
+      ...prev.map((inv) => (inv.pacienteId === pacienteId && inv.status !== "usado" ? { ...inv, status: "revogado" } : inv))
+    ]);
+    const revogados = appInvites.filter((inv) => inv.pacienteId === pacienteId && inv.status !== "usado");
+    revogados.forEach((inv) => {
+      supabaseClient.from("app_invites").update(appInviteToRow({ ...inv, status: "revogado" })).eq("id", inv.id)
+        .then(() => {}).catch((e) => console.error("Falha ao revogar convite anterior:", e));
+    });
+    supabaseClient.from("app_invites").insert(appInviteToRow(novo))
+      .then(() => {})
+      .catch((e) => {
+        console.error("Falha ao gerar convite:", e);
+        logSync(`O código ${novo.code} foi criado, mas não foi salvo no banco — pode não funcionar se a página for recarregada.`, false);
+      });
+    return novo;
+  };
+
+  const salvarConteudo = (item, { registrarVersao = true } = {}) => {
+    const anterior = contentItems.find((c) => c.id === item.id);
+    const existe = !!anterior;
+    let versoes = anterior?.versoes || [];
+    if (existe && registrarVersao && (anterior.corpo !== item.corpo || anterior.titulo !== item.titulo)) {
+      versoes = [
+        { titulo: anterior.titulo, corpo: anterior.corpo, status: anterior.status, salvoEm: anterior.updatedAt || new Date().toISOString() },
+        ...versoes
+      ].slice(0, 5);
+    }
+    const atualizado = { ...item, id: item.id || uid(), versoes, updatedAt: new Date().toISOString() };
+    setContentItems((prev) => existe ? prev.map((c) => (c.id === atualizado.id ? atualizado : c)) : [atualizado, ...prev]);
+    const op = existe
+      ? supabaseClient.from("app_content").update(contentToRow(atualizado)).eq("id", atualizado.id)
+      : supabaseClient.from("app_content").insert(contentToRow(atualizado));
+    op.then(() => {}).catch((e) => {
+      console.error("Falha ao salvar conteúdo:", e);
+      logSync(`Não foi possível salvar "${atualizado.titulo || "conteúdo sem título"}". Verifique sua conexão e tente de novo.`, false);
+    });
+    return atualizado;
+  };
+
+  const alternarPublicacao = (item) => {
+    salvarConteudo({ ...item, status: item.status === "publicado" ? "revisao" : "publicado" }, { registrarVersao: false });
+  };
+
+  const restaurarVersaoConteudo = (item, versao) => {
+    salvarConteudo({ ...item, titulo: versao.titulo, corpo: versao.corpo }, { registrarVersao: true });
+  };
+
+  const excluirConteudo = (id) => {
+    setContentItems((prev) => prev.filter((c) => c.id !== id));
+    supabaseClient.from("app_content").delete().eq("id", id)
+      .then(() => {})
+      .catch((e) => {
+        console.error("Falha ao excluir conteúdo:", e);
+        logSync("Não foi possível excluir o conteúdo no banco de dados.", false);
+      });
+  };
+
+  const salvarMaterial = (item, { registrarVersao = true } = {}) => {
+    const anterior = materiais.find((m) => m.id === item.id);
+    const existe = !!anterior;
+    let versoes = anterior?.versoes || [];
+    if (existe && registrarVersao && JSON.stringify({ ...anterior, versoes: null, updatedAt: null }) !== JSON.stringify({ ...item, versoes: null, updatedAt: null })) {
+      versoes = [
+        { ...anterior, versoes: undefined, salvoEm: anterior.updatedAt || new Date().toISOString() },
+        ...versoes
+      ].slice(0, 5);
+    }
+    const atualizado = { ...item, id: item.id || uid(), versoes, updatedAt: new Date().toISOString() };
+    setMateriais((prev) => existe ? prev.map((m) => (m.id === atualizado.id ? atualizado : m)) : [atualizado, ...prev]);
+    const op = existe
+      ? supabaseClient.from("biblioteca_materiais").update(materialToRow(atualizado)).eq("id", atualizado.id)
+      : supabaseClient.from("biblioteca_materiais").insert(materialToRow(atualizado));
+    op.then(() => {}).catch((e) => {
+      console.error("Falha ao salvar material:", e);
+      logSync(`Não foi possível salvar "${atualizado.titulo || "material sem título"}" na biblioteca. Verifique sua conexão e tente de novo.`, false);
+    });
+    return atualizado;
+  };
+
+  const excluirMaterial = (id) => {
+    setMateriais((prev) => prev.filter((m) => m.id !== id));
+    supabaseClient.from("biblioteca_materiais").delete().eq("id", id)
+      .then(() => {})
+      .catch((e) => {
+        console.error("Falha ao excluir material:", e);
+        logSync("Não foi possível excluir o material na biblioteca.", false);
+      });
+  };
+
+  const excluirSessao = (id, sessaoId) => {
+    setPatients((prev) => prev.map((p) => {
+      if (p.id !== id) return p;
+      const acomp = p.acompanhamento ? { ...p.acompanhamento, consultasRealizadas: Math.max(0, (p.acompanhamento.consultasRealizadas || 0) - 1) } : p.acompanhamento;
+      const atualizado = { ...p, acompanhamento: acomp, sessoes: (p.sessoes || []).filter((s) => s.id !== sessaoId) };
+      persistirPaciente(atualizado);
+      return atualizado;
+    }));
+  };
+
+  const excluirPagamento = (id, pagamentoId) => {
+    setPatients((prev) => prev.map((p) => {
+      if (p.id !== id) return p;
+      const atualizado = { ...p, pagamentos: (p.pagamentos || []).filter((pg) => pg.id !== pagamentoId) };
+      persistirPaciente(atualizado);
+      return atualizado;
+    }));
+  };
+
   const addExame = (id, exame) => {
     mutarPaciente(id, (p) => ({ ...p, exames: [...(p.exames || []), exame] }));
   };
@@ -1600,6 +1962,19 @@ function App() {
     mutarPaciente(id, (p) => ({ ...p, marcosAlimentares: (p.marcosAlimentares || []).filter((m) => m.id !== marcoId) }));
   };
 
+  if (erroCarregamento) {
+    return <div style={{ ...styles.root, alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ maxWidth: 380, textAlign: "center", fontFamily: "Lato, sans-serif" }}>
+        <AlertTriangle size={28} color="#A99790" style={{ marginBottom: 12 }} />
+        <div style={{ color: "#16332E", fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Não foi possível carregar os dados</div>
+        <div style={{ color: "#6E6355", fontSize: 13.5, lineHeight: 1.6, marginBottom: 16 }}>
+          Isso costuma ser uma falha de conexão com a internet ou com o banco de dados. Nenhuma paciente foi apagada — os dados continuam salvos, só não carregaram desta vez.
+        </div>
+        <button style={styles.primaryBtn} onClick={carregarDados}>Tentar novamente</button>
+      </div>
+    </div>;
+  }
+
   if (!loaded) {
     return <div style={{ ...styles.root, alignItems: "center", justifyContent: "center" }}>
       <div style={{ color: "#6E6355", fontFamily: "Lato, sans-serif" }}>Carregando…</div>
@@ -1611,7 +1986,7 @@ function App() {
       <Sidebar
         view={view}
         setView={(v) => { setView(v); setMobileNavOpen(false); }}
-        onNewPatient={() => { setNovoPacienteProspeccao(false); setShowNewPatient(true); setMobileNavOpen(false); }}
+        onNewPatient={() => { setShowNewPatient(true); setMobileNavOpen(false); }}
         mobileOpen={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
       />
@@ -1620,14 +1995,17 @@ function App() {
       )}
       <div style={styles.main}>
         <Header query={query} setQuery={setQuery} onMenuClick={() => setMobileNavOpen(true)} />
+      <SyncBanner syncLog={syncLog} onVerDetalhes={() => setView("integracoes")} />
         <div style={styles.content} className="content">
-          {view === "dashboard" && <Dashboard patients={patients} followups={followups} setView={setView} setSelectedId={setSelectedId} setFiltroPacientesInicial={setFiltroPacientesInicial} />}
-          {view === "patients" && <PatientsList patients={filteredPatients} events={events} onOpen={(id) => setSelectedId(id)} onNew={() => { setNovoPacienteProspeccao(false); setShowNewPatient(true); }} onQuickConsulta={registrarConsultaHoje} onExportar={exportarPacientesExcel} onImportar={importarPacientesExcel} filtroInicial={filtroPacientesInicial} />}
-          {view === "agenda" && <Agenda patients={patients} events={events} onAdd={addEvent} onUpdate={updateEvent} onDelete={deleteEvent} />}
-          {view === "followups" && <FollowupsBoard followups={followups} patients={patients} onMove={moveFollowup} onUpdate={atualizarFollowup} onAdd={addFollowup} onDelete={deleteFollowup} onCriarProspeccao={criarFollowupsProspeccao} onNovaProspeccao={() => { setNovoPacienteProspeccao(true); setShowNewPatient(true); }} />}
-          {view === "financeiro" && <Financeiro patients={patients} onAddPagamento={addPagamento} />}
+          {view === "dashboard" && <Dashboard patients={patients} followups={followups} setView={setView} setSelectedId={setSelectedId} setFiltroPacientesInicial={setFiltroPacientesInicial} setFollowupsAbaInicial={setFollowupsAbaInicial} />}
+          {view === "patients" && <PatientsList patients={filteredPatients} events={events} onOpen={(id) => setSelectedId(id)} onNew={() => setShowNewPatient(true)} onQuickConsulta={registrarConsultaHoje} onExportar={exportarPacientesExcel} onImportar={importarPacientesExcel} filtroInicial={filtroPacientesInicial} />}
+          {view === "agenda" && <Agenda patients={patients} events={events} onAdd={addEvent} onUpdate={updateEvent} onDelete={deleteEvent} onOpen={(id) => setSelectedId(id)} />}
+          {view === "followups" && <FollowupsBoard followups={followups} patients={patients} onMove={moveFollowup} onAdd={addFollowup} onDelete={deleteFollowup} onCriarProspeccao={criarFollowupsProspeccao} onOpen={(id) => setSelectedId(id)} abaInicial={followupsAbaInicial} />}
+          {view === "financeiro" && <Financeiro patients={patients} onAddPagamento={addPagamento} onOpen={(id) => setSelectedId(id)} />}
+          {view === "appContent" && <AppContent items={contentItems} onSave={salvarConteudo} onDelete={excluirConteudo} onTogglePublish={alternarPublicacao} onRestaurarVersao={restaurarVersaoConteudo} />}
+          {view === "biblioteca" && <BibliotecaMateriais items={materiais} patients={patients} onSave={salvarMaterial} onDelete={excluirMaterial} onOpenPatient={(id) => setSelectedId(id)} />}
           {view === "administracao" && (
-            <Administracao patients={patients} contratosModelo={contratosModelo} setContratosModelo={setContratosModelo} />
+            <Administracao patients={patients} contratosModelo={contratosModelo} setContratosModelo={setContratosModelo} onOpen={(id) => setSelectedId(id)} />
           )}
           {view === "integracoes" && (
             <Integracoes
@@ -1639,7 +2017,6 @@ function App() {
               onDesconectar={desconectarGoogle}
               onSincronizarTudo={sincronizarTudoComGoogle}
               syncLog={syncLog}
-              onResetarBase={resetarBaseDados}
               onSugerirTipos={sugerirTiposAcompanhamento}
               patients={patients}
               followups={followups}
@@ -1665,16 +2042,29 @@ function App() {
           onSetPlanoAcao={(p) => setPlanoAcao(selectedPatient.id, p)}
           onAddExame={(e) => addExame(selectedPatient.id, e)}
           onDeleteExame={(eid) => deleteExame(selectedPatient.id, eid)}
+          onExcluirSessao={(sid) => excluirSessao(selectedPatient.id, sid)}
+          onExcluirPagamento={(pid) => excluirPagamento(selectedPatient.id, pid)}
           onAddMarcoAlimentar={(m) => addMarcoAlimentar(selectedPatient.id, m)}
           onDeleteMarcoAlimentar={(mid) => deleteMarcoAlimentar(selectedPatient.id, mid)}
+          appInvites={appInvites.filter((inv) => inv.pacienteId === selectedPatient.id)}
+          onToggleAppPrograma={(programaId) => toggleAppPrograma(selectedPatient.id, programaId)}
+          onSetAppStatus={(status, motivo) => setAppStatus(selectedPatient.id, status, motivo)}
+          onGerarConvite={(programas) => gerarConvite(selectedPatient.id, programas)}
+          onSalvarCardapio={(cardapio, publicar) => salvarCardapio(selectedPatient.id, cardapio, publicar)}
+          onRestaurarVersaoCardapio={(versao) => restaurarVersaoCardapio(selectedPatient.id, versao)}
+          materiais={materiais}
+          onVincularMaterial={(materialId) => {
+            const item = materiais.find((m) => m.id === materialId);
+            if (item) salvarMaterial({ ...item, pacienteId: selectedPatient.id }, { registrarVersao: false });
+          }}
+          onDesvincularMaterial={(materialId) => {
+            const item = materiais.find((m) => m.id === materialId);
+            if (item) salvarMaterial({ ...item, pacienteId: "" }, { registrarVersao: false });
+          }}
         />
       )}
       {showNewPatient && (
-        <NewPatientModal
-          prospeccaoInicial={novoPacienteProspeccao}
-          onClose={() => { setShowNewPatient(false); setNovoPacienteProspeccao(false); }}
-          onSave={(p) => { addPatient(p); setShowNewPatient(false); setNovoPacienteProspeccao(false); }}
-        />
+        <NewPatientModal patients={patients} onClose={() => setShowNewPatient(false)} onSave={(p) => { addPatient(p); setShowNewPatient(false); }} />
       )}
     </div>
   );
@@ -1687,6 +2077,8 @@ function Sidebar({ view, setView, onNewPatient, mobileOpen, onClose }) {
     { id: "agenda", label: "Agenda", icon: CalendarIcon },
     { id: "followups", label: "Follow-up", icon: CheckSquare },
     { id: "financeiro", label: "Financeiro", icon: DollarSign },
+    { id: "appContent", label: "Conteúdo do app", icon: Upload },
+    { id: "biblioteca", label: "Biblioteca de materiais", icon: BookOpen },
     { id: "administracao", label: "Administração", icon: FileText },
     { id: "integracoes", label: "Integrações", icon: Settings }
   ];
@@ -1720,18 +2112,20 @@ function Sidebar({ view, setView, onNewPatient, mobileOpen, onClose }) {
           const Icon = it.icon;
           const active = view === it.id;
           return (
-            <div
+            <button
               key={it.id}
               onClick={() => setView(it.id)}
+              aria-current={active ? "page" : undefined}
               style={{
                 ...styles.navItem,
+                width: "100%", textAlign: "left", border: "none", font: "inherit",
                 background: active ? "#867A6E" : "transparent",
                 color: active ? "#F6F0E7" : "#6E6355"
               }}
             >
               <Icon size={17} />
               <span>{it.label}</span>
-            </div>
+            </button>
           );
         })}
       </nav>
@@ -1775,10 +2169,392 @@ function Header({ query, setQuery, onMenuClick }) {
   );
 }
 
+function SyncBanner({ syncLog, onVerDetalhes }) {
+  const ultimoErro = syncLog.find((l) => !l.ok);
+  const [dispensado, setDispensado] = useState(null);
+  if (!ultimoErro || dispensado === ultimoErro.id) return null;
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10, background: "#F7E6DF",
+      borderBottom: "1px solid #E6C7BA", padding: "9px 20px", fontSize: 12.5, color: "#8A4A34"
+    }}>
+      <AlertTriangle size={14} />
+      <span style={{ flex: 1 }}>{ultimoErro.msg}</span>
+      <button onClick={onVerDetalhes} style={{ background: "none", border: "none", color: "#8A4A34", fontWeight: 700, fontSize: 12.5, textDecoration: "underline", padding: 0 }}>
+        Ver detalhes
+      </button>
+      <button onClick={() => setDispensado(ultimoErro.id)} aria-label="Dispensar aviso" style={{ background: "none", border: "none", color: "#8A4A34", padding: 0, display: "flex" }}>
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------
+   Conteúdo do app
+--------------------------------------------------------- */
+function AppContent({ items, onSave, onDelete, onTogglePublish, onRestaurarVersao }) {
+  const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [editando, setEditando] = useState(null);
+  const [mostrarForm, setMostrarForm] = useState(false);
+
+  const contagem = {
+    publicado: items.filter((c) => c.status === "publicado").length,
+    revisao: items.filter((c) => c.status === "revisao").length,
+    aguardando: items.filter((c) => c.status === "aguardando" || c.status === "rascunho").length
+  };
+
+  const visiveis = filtroTipo === "todos" ? items : items.filter((c) => c.tipo === filtroTipo);
+
+  const novoItem = () => {
+    setEditando({ id: null, tipo: "corte", titulo: "", fase: "", nivelMinimo: "gratuito", status: "aguardando", corpo: "", fontes: "" });
+    setMostrarForm(true);
+  };
+  const abrirEdicao = (item) => { setEditando({ ...item }); setMostrarForm(true); };
+  const salvar = () => {
+    if (!editando.titulo.trim()) return;
+    onSave(editando);
+    setMostrarForm(false);
+    setEditando(null);
+  };
+
+  return (
+    <div>
+      <SectionTitle
+        title="Conteúdo do app"
+        subtitle="O que você publica aqui aparece para as mães conforme a fase e o programa"
+        action={<button style={styles.primaryBtn} onClick={novoItem}><Plus size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Novo conteúdo</button>}
+      />
+
+      <div className="cards-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 18 }}>
+        <MetricCard label="Publicados" value={contagem.publicado} icon={CheckCircle2} accent="#918567" />
+        <MetricCard label="Em revisão" value={contagem.revisao} icon={Clock} accent="#B4863F" />
+        <MetricCard label="Aguardando material" value={contagem.aguardando} icon={AlertTriangle} accent="#A99790" />
+      </div>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+        <button onClick={() => setFiltroTipo("todos")} style={{ ...styles.secondaryBtn, ...(filtroTipo === "todos" ? { background: "#867A6E", color: "#F6F0E7" } : {}) }}>Todos</button>
+        {CONTEUDO_TIPOS.map((t) => (
+          <button key={t.id} onClick={() => setFiltroTipo(t.id)} style={{ ...styles.secondaryBtn, ...(filtroTipo === t.id ? { background: "#867A6E", color: "#F6F0E7" } : {}) }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {mostrarForm && editando && (
+        <div style={{ ...styles.panel, marginBottom: 16 }}>
+          <div style={styles.miniTitle}>{editando.id ? "Editar conteúdo" : "Novo conteúdo"}</div>
+          <div className="new-patient-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <Field label="Título" value={editando.titulo} onChange={(v) => setEditando((f) => ({ ...f, titulo: v }))} full />
+            <Field label="Tipo" type="select" options={CONTEUDO_TIPOS.map((t) => t.label)}
+              value={CONTEUDO_TIPOS.find((t) => t.id === editando.tipo)?.label}
+              onChange={(label) => setEditando((f) => ({ ...f, tipo: CONTEUDO_TIPOS.find((t) => t.label === label)?.id }))} />
+            <Field label="Fase (1 a 8, opcional)" type="number" value={editando.fase} onChange={(v) => setEditando((f) => ({ ...f, fase: v }))} />
+            <Field label="Acesso" type="select" options={["Gratuito", "Pago"]}
+              value={editando.nivelMinimo === "pago" ? "Pago" : "Gratuito"}
+              onChange={(v) => setEditando((f) => ({ ...f, nivelMinimo: v === "Pago" ? "pago" : "gratuito" }))} />
+            <Field label="Status" type="select" options={["Aguardando material", "Rascunho", "Em revisão", "Publicado"]}
+              value={CONTEUDO_STATUS[editando.status]?.label}
+              onChange={(label) => setEditando((f) => ({ ...f, status: Object.keys(CONTEUDO_STATUS).find((k) => CONTEUDO_STATUS[k].label === label) }))} />
+            <Field label="Fontes (SBP, OMS, Ministério da Saúde...)" value={editando.fontes} onChange={(v) => setEditando((f) => ({ ...f, fontes: v }))} />
+            <div style={{ gridColumn: "1 / -1" }}>
+              <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>Texto do conteúdo</div>
+              <textarea
+                value={editando.corpo}
+                onChange={(e) => setEditando((f) => ({ ...f, corpo: e.target.value }))}
+                placeholder="Escreva o conteúdo que aparecerá para as mães no app..."
+                style={{ ...styles.input, minHeight: 140, resize: "vertical", fontFamily: "Lato, sans-serif" }}
+              />
+            </div>
+          </div>
+          {editando.id && editando.versoes && editando.versoes.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={styles.divider} />
+              <div style={styles.miniTitle}>Versões anteriores ({editando.versoes.length})</div>
+              {editando.versoes.map((v, idx) => (
+                <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid #E3DACB" }}>
+                  <div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "#867A6E" }}>{v.titulo}</div>
+                    <div style={{ fontSize: 11, color: "#9C9284" }}>Salva em {formatData((v.salvoEm || "").slice(0, 10))}</div>
+                  </div>
+                  <button
+                    style={{ ...styles.secondaryBtn, padding: "5px 10px", fontSize: 11.5 }}
+                    onClick={() => { if (window.confirm("Restaurar esta versão? O texto atual vira uma nova versão no histórico.")) { onRestaurarVersao(editando, v); setMostrarForm(false); setEditando(null); } }}
+                  >
+                    Restaurar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+            <button style={styles.secondaryBtn} onClick={() => { setMostrarForm(false); setEditando(null); }}>Cancelar</button>
+            <button style={styles.primaryBtn} disabled={!editando.titulo.trim()} onClick={salvar}>Salvar</button>
+          </div>
+        </div>
+      )}
+
+      <div style={styles.panel}>
+        <div style={styles.tableHeader} className="table-header">
+          <div style={{ flex: 2 }}>Conteúdo</div>
+          <div style={{ flex: 1 }}>Tipo</div>
+          <div style={{ flex: 0.6 }}>Fase</div>
+          <div style={{ flex: 1 }}>Acesso</div>
+          <div style={{ flex: 1 }}>Status</div>
+          <div style={{ width: 190 }} />
+        </div>
+        {visiveis.length === 0 && <div style={styles.emptyRow}>Nenhum conteúdo cadastrado ainda neste filtro.</div>}
+        {visiveis.map((c) => (
+          <div key={c.id} style={styles.tableRow} className="table-row">
+            <div style={{ flex: 2, fontWeight: 600, color: "#867A6E" }}>{c.titulo}</div>
+            <div style={{ flex: 1, fontSize: 13, color: "#6E6355" }} data-label="Tipo">{CONTEUDO_TIPOS.find((t) => t.id === c.tipo)?.label || c.tipo}</div>
+            <div style={{ flex: 0.6, fontSize: 13, color: "#6E6355" }} data-label="Fase">{c.fase || "—"}</div>
+            <div style={{ flex: 1, fontSize: 13, color: "#6E6355" }} data-label="Acesso">{c.nivelMinimo === "pago" ? "Pago" : "Gratuito"}</div>
+            <div style={{ flex: 1 }} data-label="Status">
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20,
+                background: CONTEUDO_STATUS[c.status]?.bg, color: CONTEUDO_STATUS[c.status]?.color
+              }}>
+                {CONTEUDO_STATUS[c.status]?.label}
+              </span>
+            </div>
+            <div style={{ width: 190, display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "center" }}>
+              {(c.status === "publicado" || c.status === "revisao") && (
+                <button
+                  onClick={() => onTogglePublish(c)}
+                  style={c.status === "publicado" ? styles.secondaryBtn : { ...styles.primaryBtn, padding: "6px 10px", fontSize: 12 }}
+                >
+                  {c.status === "publicado" ? "Despublicar" : "Publicar"}
+                </button>
+              )}
+              <button title="Editar" onClick={() => abrirEdicao(c)} style={{ background: "none", border: "none", color: "#9C9284", cursor: "pointer", display: "flex", padding: 0 }}>
+                <Pencil size={14} />
+              </button>
+              <button title="Excluir" onClick={() => { if (window.confirm(`Excluir "${c.titulo}"? Essa ação não pode ser desfeita.`)) onDelete(c.id); }} style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", display: "flex", padding: 0 }}>
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BibliotecaMateriais({ items, patients, onSave, onDelete, onOpenPatient }) {
+  const [filtroCategoria, setFiltroCategoria] = useState("todas");
+  const [filtroClassificacao, setFiltroClassificacao] = useState("todas");
+  const [busca, setBusca] = useState("");
+  const [editando, setEditando] = useState(null);
+  const [mostrarForm, setMostrarForm] = useState(false);
+
+  const contagem = {
+    paciente: items.filter((m) => m.classificacao === "paciente").length,
+    interno: items.filter((m) => m.classificacao === "interno").length,
+    referencia: items.filter((m) => m.classificacao === "referencia").length,
+    revisar: items.filter((m) => m.classificacao === "revisar" || !m.classificacao).length
+  };
+
+  const buscaLower = busca.trim().toLowerCase();
+  const visiveis = items
+    .filter((m) => filtroCategoria === "todas" || m.categoria === filtroCategoria)
+    .filter((m) => filtroClassificacao === "todas" || m.classificacao === filtroClassificacao)
+    .filter((m) => !buscaLower || [m.titulo, m.descricao, m.resumoBusca, (m.tags || []).join(" ")]
+      .filter(Boolean).some((campo) => campo.toLowerCase().includes(buscaLower)));
+
+  const nomePaciente = (id) => patients.find((p) => p.id === id)?.nome || "";
+
+  const materialVazio = () => ({
+    id: null, titulo: "", categoria: "outros", tipo: "pdf", descricao: "", origem: "autoral",
+    finalidade: "", publicoAlvo: "", classificacao: "revisar", status: "revisao", tags: [],
+    pacienteId: "", momentoAtendimento: "", arquivoNome: "", resumoBusca: "",
+    permiteDownload: true, permiteEnvioPaciente: false
+  });
+
+  const novoItem = () => { setEditando(materialVazio()); setMostrarForm(true); };
+  const abrirEdicao = (item) => { setEditando({ ...item, tagsTexto: (item.tags || []).join(", ") }); setMostrarForm(true); };
+  const salvar = () => {
+    if (!editando.titulo.trim()) return;
+    const { tagsTexto, ...resto } = editando;
+    const tags = (tagsTexto !== undefined ? tagsTexto : (editando.tags || []).join(", "))
+      .split(",").map((t) => t.trim()).filter(Boolean);
+    onSave({ ...resto, tags });
+    setMostrarForm(false);
+    setEditando(null);
+  };
+
+  return (
+    <div>
+      <SectionTitle
+        title="Biblioteca de materiais"
+        subtitle="Documentos originais da Bárbara (PDFs, imagens, guias) — organizados, com metadados e ligação opcional a uma paciente. Os arquivos originais em si ainda precisam de um bucket de armazenamento (ver pendências); por enquanto, registre aqui o nome do arquivo e o conteúdo pesquisável."
+        action={<button style={styles.primaryBtn} onClick={novoItem}><Plus size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Novo material</button>}
+      />
+
+      <div className="cards-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 18 }}>
+        <MetricCard label="Para paciente" value={contagem.paciente} icon={CheckCircle2} accent="#3D5A40" />
+        <MetricCard label="Internos" value={contagem.interno} icon={FileText} accent="#7A4A3D" />
+        <MetricCard label="De referência" value={contagem.referencia} icon={BookOpen} accent="#3A5A78" />
+        <MetricCard label="A revisar" value={contagem.revisar} icon={AlertTriangle} accent="#B4863F" />
+      </div>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14, alignItems: "center" }}>
+        <input placeholder="Buscar por título, tag ou conteúdo..." value={busca} onChange={(e) => setBusca(e.target.value)}
+          style={{ ...styles.input, maxWidth: 280 }} />
+        <select value={filtroCategoria} onChange={(e) => setFiltroCategoria(e.target.value)} style={{ ...styles.input, maxWidth: 220 }}>
+          <option value="todas">Todas as categorias</option>
+          {MATERIAL_CATEGORIAS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+        </select>
+        <select value={filtroClassificacao} onChange={(e) => setFiltroClassificacao(e.target.value)} style={{ ...styles.input, maxWidth: 220 }}>
+          <option value="todas">Todas as classificações</option>
+          {Object.entries(MATERIAL_CLASSIFICACAO).map(([id, c]) => <option key={id} value={id}>{c.label}</option>)}
+        </select>
+      </div>
+
+      {mostrarForm && editando && (
+        <div style={{ ...styles.panel, marginBottom: 16 }}>
+          <div style={styles.miniTitle}>{editando.id ? "Editar material" : "Novo material"}</div>
+          <div className="new-patient-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <Field label="Título" value={editando.titulo} onChange={(v) => setEditando((f) => ({ ...f, titulo: v }))} full />
+            <Field label="Categoria" type="select" options={MATERIAL_CATEGORIAS.map((c) => c.label)}
+              value={MATERIAL_CATEGORIAS.find((c) => c.id === editando.categoria)?.label}
+              onChange={(label) => setEditando((f) => ({ ...f, categoria: MATERIAL_CATEGORIAS.find((c) => c.label === label)?.id }))} />
+            <Field label="Tipo de arquivo" type="select" options={["PDF", "Imagem", "Documento", "Link"]}
+              value={{ pdf: "PDF", imagem: "Imagem", documento: "Documento", link: "Link" }[editando.tipo] || "PDF"}
+              onChange={(label) => setEditando((f) => ({ ...f, tipo: { PDF: "pdf", Imagem: "imagem", Documento: "documento", Link: "link" }[label] }))} />
+            <Field label="Classificação" type="select" options={Object.values(MATERIAL_CLASSIFICACAO).map((c) => c.label)}
+              value={MATERIAL_CLASSIFICACAO[editando.classificacao]?.label}
+              onChange={(label) => setEditando((f) => ({ ...f, classificacao: Object.keys(MATERIAL_CLASSIFICACAO).find((k) => MATERIAL_CLASSIFICACAO[k].label === label) }))} />
+            <Field label="Status" type="select" options={Object.values(MATERIAL_STATUS).map((s) => s.label)}
+              value={MATERIAL_STATUS[editando.status]?.label}
+              onChange={(label) => setEditando((f) => ({ ...f, status: Object.keys(MATERIAL_STATUS).find((k) => MATERIAL_STATUS[k].label === label) }))} />
+            <Field label="Origem" type="select" options={MATERIAL_ORIGENS.map((o) => o.label)}
+              value={MATERIAL_ORIGENS.find((o) => o.id === editando.origem)?.label}
+              onChange={(label) => setEditando((f) => ({ ...f, origem: MATERIAL_ORIGENS.find((o) => o.label === label)?.id }))} />
+            <Field label="Público-alvo" value={editando.publicoAlvo} onChange={(v) => setEditando((f) => ({ ...f, publicoAlvo: v }))} />
+            <div>
+              <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>Momento do atendimento (opcional)</div>
+              <select value={editando.momentoAtendimento || ""} onChange={(e) => setEditando((f) => ({ ...f, momentoAtendimento: e.target.value }))} style={styles.input}>
+                <option value="">Não se aplica / genérico</option>
+                {MOMENTOS_ATENDIMENTO.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>Vincular a uma paciente (opcional — material personalizado)</div>
+              <select value={editando.pacienteId || ""} onChange={(e) => setEditando((f) => ({ ...f, pacienteId: e.target.value }))} style={styles.input}>
+                <option value="">Nenhuma (material genérico)</option>
+                {patients.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+              </select>
+            </div>
+            <Field label="Nome do arquivo original" value={editando.arquivoNome} onChange={(v) => setEditando((f) => ({ ...f, arquivoNome: v }))} />
+            <Field label="Tags (separadas por vírgula)" value={editando.tagsTexto !== undefined ? editando.tagsTexto : (editando.tags || []).join(", ")}
+              onChange={(v) => setEditando((f) => ({ ...f, tagsTexto: v }))} full />
+            <div style={{ gridColumn: "1 / -1" }}>
+              <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>Finalidade / descrição</div>
+              <textarea value={editando.descricao} onChange={(e) => setEditando((f) => ({ ...f, descricao: e.target.value }))}
+                placeholder="Para que serve este material e quando usá-lo..."
+                style={{ ...styles.input, minHeight: 70, resize: "vertical", fontFamily: "Lato, sans-serif" }} />
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>Conteúdo pesquisável (resumo do material, para a busca encontrar depois)</div>
+              <textarea value={editando.resumoBusca} onChange={(e) => setEditando((f) => ({ ...f, resumoBusca: e.target.value }))}
+                placeholder="Cole aqui um resumo do conteúdo (tópicos, faixas etárias, alimentos citados etc.) para facilitar a busca futura..."
+                style={{ ...styles.input, minHeight: 100, resize: "vertical", fontFamily: "Lato, sans-serif" }} />
+            </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#6E6355" }}>
+              <input type="checkbox" checked={editando.permiteDownload !== false} onChange={(e) => setEditando((f) => ({ ...f, permiteDownload: e.target.checked }))} />
+              Permite download
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#6E6355" }}>
+              <input type="checkbox" checked={!!editando.permiteEnvioPaciente} onChange={(e) => setEditando((f) => ({ ...f, permiteEnvioPaciente: e.target.checked }))} />
+              Pode ser enviado diretamente à paciente
+            </label>
+          </div>
+
+          {editando.id && editando.versoes && editando.versoes.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={styles.divider} />
+              <div style={styles.miniTitle}>Versões anteriores dos metadados ({editando.versoes.length})</div>
+              {editando.versoes.map((v, idx) => (
+                <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid #E3DACB" }}>
+                  <div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "#867A6E" }}>{v.titulo}</div>
+                    <div style={{ fontSize: 11, color: "#9C9284" }}>Salva em {formatData((v.salvoEm || "").slice(0, 10))}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+            <button style={styles.secondaryBtn} onClick={() => { setMostrarForm(false); setEditando(null); }}>Cancelar</button>
+            <button style={styles.primaryBtn} disabled={!editando.titulo.trim()} onClick={salvar}>Salvar</button>
+          </div>
+        </div>
+      )}
+
+      <div style={styles.panel}>
+        <div style={styles.tableHeader} className="table-header">
+          <div style={{ flex: 2 }}>Material</div>
+          <div style={{ flex: 1 }}>Categoria</div>
+          <div style={{ flex: 1.2 }}>Classificação</div>
+          <div style={{ flex: 1 }}>Paciente</div>
+          <div style={{ flex: 1 }}>Status</div>
+          <div style={{ width: 80 }} />
+        </div>
+        {visiveis.length === 0 && <div style={styles.emptyRow}>Nenhum material cadastrado ainda neste filtro.</div>}
+        {visiveis.map((m) => (
+          <div key={m.id} style={styles.tableRow} className="table-row">
+            <div style={{ flex: 2 }}>
+              <div style={{ fontWeight: 600, color: "#867A6E" }}>{m.titulo}</div>
+              {m.tags && m.tags.length > 0 && (
+                <div style={{ fontSize: 11, color: "#9C9284", marginTop: 2 }}>{m.tags.join(" · ")}</div>
+              )}
+            </div>
+            <div style={{ flex: 1, fontSize: 13, color: "#6E6355" }} data-label="Categoria">{MATERIAL_CATEGORIAS.find((c) => c.id === m.categoria)?.label || m.categoria}</div>
+            <div style={{ flex: 1.2 }} data-label="Classificação">
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20,
+                background: MATERIAL_CLASSIFICACAO[m.classificacao]?.bg, color: MATERIAL_CLASSIFICACAO[m.classificacao]?.color
+              }}>
+                {MATERIAL_CLASSIFICACAO[m.classificacao]?.label || "A revisar"}
+              </span>
+            </div>
+            <div style={{ flex: 1, fontSize: 13 }} data-label="Paciente">
+              {m.pacienteId ? (
+                <button onClick={() => onOpenPatient(m.pacienteId)} style={{ background: "none", border: "none", padding: 0, color: "#3A5A78", cursor: "pointer", textDecoration: "underline", fontSize: 13 }}>
+                  {nomePaciente(m.pacienteId) || "Ver paciente"}
+                </button>
+              ) : <span style={{ color: "#9C9284" }}>Genérico</span>}
+            </div>
+            <div style={{ flex: 1 }} data-label="Status">
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20,
+                background: MATERIAL_STATUS[m.status]?.bg, color: MATERIAL_STATUS[m.status]?.color
+              }}>
+                {MATERIAL_STATUS[m.status]?.label}
+              </span>
+            </div>
+            <div style={{ width: 80, display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "center" }}>
+              <button title="Editar" onClick={() => abrirEdicao(m)} style={{ background: "none", border: "none", color: "#9C9284", cursor: "pointer", display: "flex", padding: 0 }}>
+                <Pencil size={14} />
+              </button>
+              <button title="Excluir" onClick={() => { if (window.confirm(`Excluir "${m.titulo}"? Essa ação não pode ser desfeita.`)) onDelete(m.id); }} style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", display: "flex", padding: 0 }}>
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------
    Dashboard
 --------------------------------------------------------- */
-function Dashboard({ patients, followups, setView, setSelectedId, setFiltroPacientesInicial }) {
+function Dashboard({ patients, followups, setView, setSelectedId, setFiltroPacientesInicial, setFollowupsAbaInicial }) {
   const [ordenacaoSemContato, setOrdenacaoSemContato] = useState("dias");
   const ativos = patients.filter((p) => p.status === "ativo").length;
   const pausa = patients.filter((p) => p.status === "pausa").length;
@@ -1790,25 +2566,30 @@ function Dashboard({ patients, followups, setView, setSelectedId, setFiltroPacie
     : 0;
 
   const receitaPrevista = patients.reduce((s, p) => s + (p.acompanhamento?.valor || 0), 0);
-  const receitaRecebida = patients.reduce((s, p) => {
-    const a = p.acompanhamento;
-    if (!a || !a.consultasTotal) return s;
-    return s + (a.valor / a.consultasTotal) * a.consultasRealizadas;
-  }, 0);
-  const receitaPendente = receitaPrevista - receitaRecebida;
+  const receitaRecebidaPlano = patients.reduce((s, p) => s + (p.pagamentos || []).filter((pg) => pg.tipo !== "avulso").reduce((s2, pg) => s2 + pg.valor, 0), 0);
+  const receitaRecebidaAvulso = patients.reduce((s, p) => s + (p.pagamentos || []).filter((pg) => pg.tipo === "avulso").reduce((s2, pg) => s2 + pg.valor, 0), 0);
+  const receitaRecebida = receitaRecebidaPlano + receitaRecebidaAvulso;
+  const receitaPendente = Math.max(0, receitaPrevista - receitaRecebidaPlano);
 
   const semContato = patients.filter((p) => {
     const d = diasDesde(p.ultimoContato);
     return d !== null && d >= 21 && p.status === "ativo";
   });
 
-  const followupsPendentes = followups.filter((f) => f.coluna !== "concluido").length;
+  const statusDoPaciente = (id) => patients.find((p) => p.id === id)?.status;
+  const followupsPendentesLista = followups.filter((f) => f.coluna !== "concluido");
+  const followupsPendentesProspeccao = followupsPendentesLista.filter((f) => statusDoPaciente(f.pacienteId) === "prospect").length;
+  const followupsPendentesClientes = followupsPendentesLista.length - followupsPendentesProspeccao;
 
   const aniversariantes = patients.filter((p) => {
     if (!p.dataNascimento) return false;
     const n = new Date(p.dataNascimento);
     const hoje = new Date();
-    const proximo = new Date(hoje.getFullYear(), n.getMonth(), n.getDate());
+    hoje.setHours(0, 0, 0, 0);
+    let proximo = new Date(hoje.getFullYear(), n.getMonth(), n.getDate());
+    // Se o aniversário deste ano já passou, olha para o próximo ano
+    // (evita perder aniversários de início de janeiro vistos no fim de dezembro).
+    if (proximo < hoje) proximo = new Date(hoje.getFullYear() + 1, n.getMonth(), n.getDate());
     const diff = (proximo - hoje) / (1000 * 60 * 60 * 24);
     return diff >= 0 && diff <= 7;
   });
@@ -1854,8 +2635,10 @@ function Dashboard({ patients, followups, setView, setSelectedId, setFiltroPacie
         <MetricCard label="Em prospecção" value={prospeccao} icon={MessageCircle} accent="#A99790"
           onClick={() => { setFiltroPacientesInicial("prospect"); setView("patients"); }} />
         <MetricCard label="Taxa de conversão (geral)" value={`${taxaConversao}%`} icon={TrendingUp} accent="#918567" />
-        <MetricCard label="Follow-ups pendentes" value={followupsPendentes} icon={MessageCircle} accent="#A99790"
-          onClick={() => setView("followups")} />
+        <MetricCard label="Follow-ups de clientes" value={followupsPendentesClientes} icon={CheckSquare} accent="#918567"
+          onClick={() => { setFollowupsAbaInicial("clientes"); setView("followups"); }} />
+        <MetricCard label="Follow-ups de prospecção" value={followupsPendentesProspeccao} icon={MessageCircle} accent="#A99790"
+          onClick={() => { setFollowupsAbaInicial("prospeccao"); setView("followups"); }} />
         <MetricCard label="Receita prevista" value={formatMoeda(receitaPrevista)} icon={DollarSign} accent="#867A6E"
           onClick={() => setView("financeiro")} />
         <MetricCard label="Receita recebida" value={formatMoeda(receitaRecebida)} icon={TrendingUp} accent="#918567"
@@ -1914,7 +2697,7 @@ function Dashboard({ patients, followups, setView, setSelectedId, setFiltroPacie
               {linkWhatsApp(p.whatsapp || p.telefone) && (
                 <a
                   href={linkWhatsApp(p.whatsapp || p.telefone, `Olá, ${p.responsavel || ""}! Passando para desejar um feliz aniversário para a ${p.nome}! 🎂`)}
-                  onClick={(e) => abrirWhatsApp(e, linkWhatsApp(p.whatsapp || p.telefone, `Olá, ${p.responsavel || ""}! Passando para desejar um feliz aniversário para a ${p.nome}! 🎂`))}
+                  target="_blank" rel="noopener noreferrer"
                   style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#918567", fontWeight: 600, textDecoration: "none" }}
                 >
                   <Cake size={14} /> Parabenizar
@@ -2153,8 +2936,7 @@ function PatientsList({ patients, events, onOpen, onNew, onQuickConsulta, onExpo
               {linkWhatsApp(p.whatsapp || p.telefone) && (
                 <a
                   href={linkWhatsApp(p.whatsapp || p.telefone, `Olá, ${p.responsavel || ""}! Aqui é a Bárbara, nutricionista da ${p.nome}.`)}
-                  onClick={(e) => abrirWhatsApp(e, linkWhatsApp(p.whatsapp || p.telefone, `Olá, ${p.responsavel || ""}! Aqui é a Bárbara, nutricionista da ${p.nome}.`))}
-                  title="Abrir WhatsApp"
+                  target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp"
                   style={{
                     background: "#EFE6D8", borderRadius: 8, padding: 6,
                     display: "flex", color: "#867A6E", cursor: "pointer", width: "fit-content"
@@ -2202,7 +2984,18 @@ function StatusPill({ status }) {
   );
 }
 
-function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedicao, onAddPagamento, onAddSessao, onSetTipoAcompanhamento, onDeletePatient, onSetPlanoAcao, onAddExame, onDeleteExame, onAddMarcoAlimentar, onDeleteMarcoAlimentar }) {
+function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedicao, onAddPagamento, onAddSessao, onSetTipoAcompanhamento, onDeletePatient, onSetPlanoAcao, onAddExame, onDeleteExame, onAddMarcoAlimentar, onDeleteMarcoAlimentar, appInvites, onToggleAppPrograma, onSetAppStatus, onGerarConvite, onSalvarCardapio, onRestaurarVersaoCardapio, onExcluirSessao, onExcluirPagamento, materiais, onVincularMaterial, onDesvincularMaterial }) {
+  const [materialParaVincular, setMaterialParaVincular] = useState("");
+  const materiaisVinculados = (materiais || []).filter((m) => m.pacienteId === patient.id);
+  const materiaisDisponiveis = (materiais || []).filter((m) => m.pacienteId !== patient.id);
+  const [showGerarConvite, setShowGerarConvite] = useState(false);
+  const [convitePrograma, setConvitePrograma] = useState([]);
+  const [conviteGerado, setConviteGerado] = useState(null);
+  const [showRevogar, setShowRevogar] = useState(false);
+  const [motivoRevogacao, setMotivoRevogacao] = useState("");
+  const [showCardapio, setShowCardapio] = useState(false);
+  const [cardapioForm, setCardapioForm] = useState(null);
+  const [cardapioSalvo, setCardapioSalvo] = useState(false);
   const [showMedicaoForm, setShowMedicaoForm] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [showSessaoForm, setShowSessaoForm] = useState(false);
@@ -2215,6 +3008,10 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
   const [acompForm, setAcompForm] = useState(null);
   const [medicaoEditandoIdx, setMedicaoEditandoIdx] = useState(null);
   const [medicaoEditForm, setMedicaoEditForm] = useState(null);
+  const [sessaoEditandoId, setSessaoEditandoId] = useState(null);
+  const [sessaoEditForm, setSessaoEditForm] = useState(null);
+  const [pagamentoEditandoId, setPagamentoEditandoId] = useState(null);
+  const [pagamentoEditForm, setPagamentoEditForm] = useState(null);
   const [planoAcaoSalvo, setPlanoAcaoSalvo] = useState(false);
   const [showExameForm, setShowExameForm] = useState(false);
   const [exameForm, setExameForm] = useState({ data: new Date().toISOString().slice(0, 10), nome: "", resultado: "", categoria: "normal" });
@@ -2295,8 +3092,7 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
       consultasRealizadas: patient.acompanhamento?.consultasRealizadas || 0,
       valor: patient.acompanhamento?.valor || 0,
       formaPagamento: patient.acompanhamento?.formaPagamento || "Pix",
-      parcelas: patient.acompanhamento?.parcelas || 1,
-      ultimoContato: patient.ultimoContato || ""
+      parcelas: patient.acompanhamento?.parcelas || 1
     });
     setEditandoAcompanhamento(true);
   };
@@ -2304,7 +3100,6 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
   const salvarAcompanhamento = () => {
     onUpdate({
       proximaConsultaPrevista: acompForm.proximaConsultaPrevista,
-      ultimoContato: acompForm.ultimoContato,
       acompanhamento: {
         ...patient.acompanhamento,
         dataInicio: acompForm.dataInicio,
@@ -2340,6 +3135,27 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
     if (!window.confirm("Excluir esta medição?")) return;
     const nova = (patient.evolucao || []).filter((_, i) => i !== idx);
     onUpdate({ evolucao: nova });
+  };
+
+  const iniciarEdicaoSessao = (s) => {
+    setSessaoEditForm({ data: s.data, titulo: s.titulo, notas: s.notas || "" });
+    setSessaoEditandoId(s.id);
+  };
+  const salvarEdicaoSessao = () => {
+    const nova = (patient.sessoes || []).map((s) => (s.id === sessaoEditandoId ? { ...s, ...sessaoEditForm } : s));
+    onUpdate({ sessoes: nova });
+    setSessaoEditandoId(null);
+  };
+
+  const iniciarEdicaoPagamento = (pg) => {
+    setPagamentoEditForm({ data: pg.data, valor: pg.valor, formaPagamento: pg.formaPagamento });
+    setPagamentoEditandoId(pg.id);
+  };
+  const salvarEdicaoPagamento = () => {
+    if (!pagamentoEditForm.valor || Number(pagamentoEditForm.valor) <= 0) return;
+    const nova = (patient.pagamentos || []).map((pg) => (pg.id === pagamentoEditandoId ? { ...pg, ...pagamentoEditForm, valor: Number(pagamentoEditForm.valor) } : pg));
+    onUpdate({ pagamentos: nova });
+    setPagamentoEditandoId(null);
   };
 
   const salvarExame = () => {
@@ -2524,7 +3340,7 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                 {linkWhatsApp(patient.whatsapp || patient.telefone) && (
                   <a
                     href={linkWhatsApp(patient.whatsapp || patient.telefone, `Olá, ${patient.responsavel || ""}! Aqui é a Bárbara, nutricionista da ${patient.nome}.`)}
-                    onClick={(e) => abrirWhatsApp(e, linkWhatsApp(patient.whatsapp || patient.telefone, `Olá, ${patient.responsavel || ""}! Aqui é a Bárbara, nutricionista da ${patient.nome}.`))}
+                    target="_blank" rel="noopener noreferrer"
                     style={styles.contactActionBtn}
                   >
                     <MessageCircle size={13} /> WhatsApp
@@ -2548,6 +3364,309 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                   <span key={t} style={styles.tagPill}><TagIcon size={11} /> {t}</span>
                 ))}
               </div>
+
+              <div style={styles.divider} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={styles.miniTitle}>Aplicativo Comê</div>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20,
+                  background: patient.app?.status === "ativo" ? "#DCE8D8" : patient.app?.status === "revogado" ? "#F7E6DF" : "#EFE6D8",
+                  color: patient.app?.status === "ativo" ? "#3D5A40" : patient.app?.status === "revogado" ? "#8A4A34" : "#867A6E"
+                }}>
+                  {patient.app?.status === "ativo" ? "Vinculada ao app" : patient.app?.status === "revogado" ? "Acesso revogado" : "Não vinculada"}
+                </span>
+              </div>
+
+              <div style={{ fontSize: 12, color: "#9C9284", marginBottom: 10 }}>
+                Programas liberados automaticamente para {patient.nome} no app, sem custo adicional, enquanto o acompanhamento estiver ativo.
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+                {APP_PROGRAMAS.map((prog) => {
+                  const ligado = (patient.app?.programas || []).includes(prog.id);
+                  return (
+                    <label key={prog.id} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "9px 12px", borderRadius: 8, border: "1px solid #E3DACB",
+                      background: ligado ? "#F4EFE4" : "#FFFFFF", cursor: "pointer"
+                    }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#6E6355" }}>
+                        <input type="checkbox" checked={ligado} onChange={() => onToggleAppPrograma(prog.id)} style={{ accentColor: "#867A6E", width: 16, height: 16 }} />
+                        {prog.label}
+                      </span>
+                      {ligado && <span style={{ fontSize: 11, color: "#918567", fontWeight: 600 }}>Liberado</span>}
+                    </label>
+                  );
+                })}
+              </div>
+
+              {patient.app?.status === "revogado" && patient.app?.motivoRevogacao && (
+                <div style={{ ...styles.emptyRow, background: "#F7E6DF", borderRadius: 8, padding: "8px 12px", marginBottom: 10 }}>
+                  Motivo da revogação: {patient.app.motivoRevogacao}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                <button
+                  style={styles.primaryBtn}
+                  onClick={() => { setConvitePrograma(patient.app?.programas || []); setConviteGerado(null); setShowGerarConvite(true); }}
+                >
+                  <Link2 size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Gerar convite do app
+                </button>
+                {patient.app?.status !== "revogado" ? (
+                  <button style={styles.secondaryBtn} onClick={() => setShowRevogar(true)}>Revogar acesso</button>
+                ) : (
+                  <button style={styles.secondaryBtn} onClick={() => onSetAppStatus("ativo")}>Reativar acesso</button>
+                )}
+              </div>
+
+              {showRevogar && (
+                <div style={{ ...styles.panel, marginBottom: 14 }}>
+                  <div style={{ fontSize: 12.5, color: "#6E6355", marginBottom: 8 }}>
+                    Isso bloqueia o acesso de {patient.nome} aos programas no app. O diário e o histórico continuam visíveis para a família.
+                  </div>
+                  <Field label="Motivo (obrigatório)" value={motivoRevogacao} onChange={setMotivoRevogacao} full />
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+                    <button style={styles.secondaryBtn} onClick={() => setShowRevogar(false)}>Cancelar</button>
+                    <button
+                      style={{ ...styles.primaryBtn, background: "#A99790" }}
+                      disabled={!motivoRevogacao.trim()}
+                      onClick={() => { onSetAppStatus("revogado", motivoRevogacao); setShowRevogar(false); setMotivoRevogacao(""); }}
+                    >
+                      Confirmar revogação
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {showGerarConvite && (
+                <div style={{ ...styles.panel, marginBottom: 14 }}>
+                  <div style={styles.miniTitle}>Programas a liberar</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                    {APP_PROGRAMAS.map((prog) => (
+                      <label key={prog.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#6E6355" }}>
+                        <input
+                          type="checkbox"
+                          checked={convitePrograma.includes(prog.id)}
+                          onChange={() => setConvitePrograma((prev) => prev.includes(prog.id) ? prev.filter((x) => x !== prog.id) : [...prev, prog.id])}
+                          style={{ accentColor: "#867A6E", width: 16, height: 16 }}
+                        />
+                        {prog.label}
+                      </label>
+                    ))}
+                  </div>
+                  {!conviteGerado ? (
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                      <button style={styles.secondaryBtn} onClick={() => setShowGerarConvite(false)}>Cancelar</button>
+                      <button
+                        style={styles.primaryBtn}
+                        disabled={convitePrograma.length === 0}
+                        onClick={() => setConviteGerado(onGerarConvite(convitePrograma))}
+                      >
+                        Gerar código
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{
+                        textAlign: "center", background: "#F6F0E7", borderRadius: 10, padding: "16px 10px", marginBottom: 12
+                      }}>
+                        <div style={{ fontSize: 11, color: "#9C9284", letterSpacing: 0.5 }}>CÓDIGO GERADO</div>
+                        <div style={{ fontFamily: "Playfair Display, serif", fontSize: 26, letterSpacing: 3, color: "#867A6E", marginTop: 4 }}>
+                          {conviteGerado.code}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "#9C9284", marginTop: 4 }}>Uso único · expira em 7 dias</div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          style={styles.secondaryBtn}
+                          onClick={() => navigator.clipboard?.writeText(conviteGerado.code)}
+                        >
+                          Copiar código
+                        </button>
+                        {linkWhatsApp(patient.whatsapp || patient.telefone) && (
+                          <a
+                            href={linkWhatsApp(
+                              patient.whatsapp || patient.telefone,
+                              `Olá, ${patient.responsavel || ""}! Seu acesso ao app Comê está pronto.\n\n1. Baixe o app\n2. Escolha "Sim, tenho um código de convite"\n3. Digite o código ${conviteGerado.code}\n\nOs programas combinados já estarão liberados para ${patient.nome}. O código é válido por 7 dias.\n\nNutrir com afeto,\nBárbara Padovani`
+                            )}
+                            target="_blank" rel="noopener noreferrer"
+                            style={{ ...styles.primaryBtn, textDecoration: "none" }}
+                          >
+                            <MessageCircle size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Enviar pelo WhatsApp
+                          </a>
+                        )}
+                      </div>
+                      <button style={{ ...styles.secondaryBtn, marginTop: 8, width: "100%" }} onClick={() => setShowGerarConvite(false)}>Fechar</button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {appInvites && appInvites.length > 0 && (
+                <div>
+                  <div style={styles.miniTitle}>Histórico de convites</div>
+                  {appInvites.map((inv) => (
+                    <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #E3DACB" }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#867A6E" }}>{inv.code}</div>
+                        <div style={{ fontSize: 11.5, color: "#9C9284" }}>
+                          {(inv.programas || []).map((pid) => APP_PROGRAMAS.find((p) => p.id === pid)?.label || pid).join(" · ")}
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 20,
+                        background: inv.status === "usado" ? "#DCE8D8" : inv.status === "revogado" ? "#F1EBDD" : "#EFE6D8",
+                        color: inv.status === "usado" ? "#3D5A40" : "#867A6E"
+                      }}>
+                        {inv.status === "usado" ? "Usado" : inv.status === "revogado" ? "Substituído" : "Aguardando"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={styles.divider} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={styles.miniTitle}>Cardápio individual do app</div>
+                {patient.app?.cardapio?.publicado && (
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: "#DCE8D8", color: "#3D5A40" }}>
+                    Publicado
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: "#9C9284", marginBottom: 10 }}>
+                Substitui o cardápio modelo da fase para {patient.nome} no app. A família é avisada quando você publica.
+              </div>
+              {patient.app?.cardapio?.atualizadoEm && (
+                <div style={{ fontSize: 11.5, color: "#9C9284", marginBottom: 10 }}>
+                  Última atualização: {formatData(patient.app.cardapio.atualizadoEm.slice(0, 10))}
+                </div>
+              )}
+              {!showCardapio ? (
+                <button
+                  style={styles.secondaryBtn}
+                  onClick={() => { setCardapioForm(patient.app?.cardapio || cardapioVazio()); setShowCardapio(true); setCardapioSalvo(false); }}
+                >
+                  {patient.app?.cardapio?.atualizadoEm ? "Editar cardápio" : "Montar cardápio"}
+                </button>
+              ) : (
+                <div style={styles.panel}>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 720 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: "left", fontSize: 11, color: "#9C9284", textTransform: "uppercase", letterSpacing: 0.4, padding: "0 8px 8px 0", width: 110 }}>Refeição</th>
+                          {DIAS_SEMANA_CARDAPIO.map((d) => (
+                            <th key={d.id} style={{ textAlign: "left", fontSize: 11, color: "#9C9284", textTransform: "uppercase", letterSpacing: 0.4, padding: "0 8px 8px" }}>{d.label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {REFEICOES_CARDAPIO.map((ref) => (
+                          <tr key={ref.id}>
+                            <td style={{ fontSize: 12.5, fontWeight: 600, color: "#867A6E", padding: "4px 8px 4px 0", verticalAlign: "top" }}>{ref.label}</td>
+                            {DIAS_SEMANA_CARDAPIO.map((d) => (
+                              <td key={d.id} style={{ padding: 4, verticalAlign: "top" }}>
+                                <textarea
+                                  value={cardapioForm.grade[d.id][ref.id]}
+                                  onChange={(e) => setCardapioForm((f) => ({
+                                    ...f, grade: { ...f.grade, [d.id]: { ...f.grade[d.id], [ref.id]: e.target.value } }
+                                  }))}
+                                  placeholder="Ex.: Abóbora 60g (4 col. sopa) + frango 40g"
+                                  style={{
+                                    width: 150, minHeight: 52, resize: "vertical", fontSize: 12, fontFamily: "Lato, sans-serif",
+                                    border: "1px solid #E3DACB", borderRadius: 6, padding: 6, color: "#6E6355"
+                                  }}
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>Observações para a família</div>
+                    <textarea
+                      value={cardapioForm.observacoes}
+                      onChange={(e) => setCardapioForm((f) => ({ ...f, observacoes: e.target.value }))}
+                      placeholder="Orientações individuais sobre este cardápio..."
+                      style={{ ...styles.input, minHeight: 70, resize: "vertical", fontFamily: "Lato, sans-serif" }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+                    <button style={styles.secondaryBtn} onClick={() => setShowCardapio(false)}>Fechar</button>
+                    <button
+                      style={styles.secondaryBtn}
+                      onClick={() => { onSalvarCardapio(cardapioForm, false); setCardapioSalvo(true); setTimeout(() => setCardapioSalvo(false), 2000); }}
+                    >
+                      Salvar rascunho
+                    </button>
+                    <button
+                      style={styles.primaryBtn}
+                      onClick={() => { onSalvarCardapio(cardapioForm, true); setShowCardapio(false); }}
+                    >
+                      Publicar no app
+                    </button>
+                  </div>
+                  {cardapioSalvo && <div style={{ fontSize: 12, color: "#918567", fontWeight: 600, marginTop: 8, textAlign: "right" }}>Rascunho salvo ✓</div>}
+
+                  {cardapioForm.versoes && cardapioForm.versoes.length > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      <div style={styles.divider} />
+                      <div style={styles.miniTitle}>Versões anteriores do cardápio ({cardapioForm.versoes.length})</div>
+                      {cardapioForm.versoes.map((v, idx) => (
+                        <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid #E3DACB" }}>
+                          <div style={{ fontSize: 12, color: "#9C9284" }}>Salva em {formatData((v.salvoEm || "").slice(0, 10))}</div>
+                          <button
+                            style={{ ...styles.secondaryBtn, padding: "5px 10px", fontSize: 11.5 }}
+                            onClick={() => {
+                              if (window.confirm("Restaurar esta versão do cardápio? O cardápio atual vira uma nova versão no histórico.")) {
+                                onRestaurarVersaoCardapio(v);
+                                setShowCardapio(false);
+                              }
+                            }}
+                          >
+                            Restaurar
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={styles.divider} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={styles.miniTitle}>Materiais vinculados</div>
+              </div>
+              {materiaisVinculados.length === 0 && (
+                <div style={{ fontSize: 12.5, color: "#9C9284", marginBottom: 10 }}>Nenhum material da biblioteca vinculado a {patient.nome} ainda.</div>
+              )}
+              {materiaisVinculados.map((m) => (
+                <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid #E3DACB" }}>
+                  <div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "#867A6E" }}>{m.titulo}</div>
+                    <div style={{ fontSize: 11, color: "#9C9284" }}>{MATERIAL_CATEGORIAS.find((c) => c.id === m.categoria)?.label || m.categoria}</div>
+                  </div>
+                  <button style={{ ...styles.secondaryBtn, padding: "5px 10px", fontSize: 11.5 }} onClick={() => onDesvincularMaterial(m.id)}>Desvincular</button>
+                </div>
+              ))}
+              {materiaisDisponiveis.length > 0 && (
+                <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
+                  <select value={materialParaVincular} onChange={(e) => setMaterialParaVincular(e.target.value)} style={{ ...styles.input, flex: 1 }}>
+                    <option value="">Vincular material existente da biblioteca...</option>
+                    {materiaisDisponiveis.map((m) => <option key={m.id} value={m.id}>{m.titulo}</option>)}
+                  </select>
+                  <button
+                    style={styles.secondaryBtn}
+                    disabled={!materialParaVincular}
+                    onClick={() => { onVincularMaterial(materialParaVincular); setMaterialParaVincular(""); }}
+                  >
+                    Vincular
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -2740,16 +3859,47 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                   {(!patient.sessoes || patient.sessoes.length === 0) && (
                     <div style={styles.emptyRow}>Nenhuma consulta registrada ainda.</div>
                   )}
-                  {(patient.sessoes || []).slice().reverse().map((s) => (
-                    <div key={s.id} style={styles.timelineItem}>
-                      <div style={styles.timelineDot} />
-                      <div>
-                        <div style={{ fontSize: 12, color: "#9C9284" }}>{formatData(s.data)}</div>
-                        <div style={{ fontSize: 14, color: "#16332E", fontWeight: 600 }}>{s.titulo}</div>
-                        {s.notas && <div style={{ fontSize: 13, color: "#6E6355", marginTop: 2 }}>{s.notas}</div>}
+                  {(patient.sessoes || []).slice().reverse().map((s) => {
+                    if (sessaoEditandoId === s.id) {
+                      return (
+                        <div key={s.id} style={{ ...styles.panel, marginBottom: 8 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 8 }}>
+                            <Field label="Data" type="date" value={sessaoEditForm.data} onChange={(v) => setSessaoEditForm((f) => ({ ...f, data: v }))} />
+                            <Field label="Título" value={sessaoEditForm.titulo} onChange={(v) => setSessaoEditForm((f) => ({ ...f, titulo: v }))} />
+                          </div>
+                          <Field label="Notas" value={sessaoEditForm.notas} onChange={(v) => setSessaoEditForm((f) => ({ ...f, notas: v }))} full />
+                          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+                            <button style={styles.secondaryBtn} onClick={() => setSessaoEditandoId(null)}>Cancelar</button>
+                            <button style={styles.primaryBtn} onClick={salvarEdicaoSessao}>Salvar</button>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={s.id} style={{ ...styles.timelineItem, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div style={{ display: "flex" }}>
+                          <div style={styles.timelineDot} />
+                          <div>
+                            <div style={{ fontSize: 12, color: "#9C9284" }}>{formatData(s.data)}</div>
+                            <div style={{ fontSize: 14, color: "#16332E", fontWeight: 600 }}>{s.titulo}</div>
+                            {s.notas && <div style={{ fontSize: 13, color: "#6E6355", marginTop: 2 }}>{s.notas}</div>}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                          <button title="Editar consulta" onClick={() => iniciarEdicaoSessao(s)} style={{ background: "none", border: "none", color: "#9C9284", cursor: "pointer", display: "flex", padding: 2 }}>
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            title="Excluir consulta"
+                            onClick={() => { if (window.confirm("Excluir esta consulta do prontuário? Isso também reduz o contador de consultas do plano em 1.")) onExcluirSessao(s.id); }}
+                            style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", display: "flex", padding: 2 }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -3015,7 +4165,6 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                     <Field label="Início do acompanhamento" type="date" value={acompForm.dataInicio} onChange={(v) => setAcompForm((f) => ({ ...f, dataInicio: v }))} />
                     <Field label="Fim previsto" type="date" value={acompForm.dataFim} onChange={(v) => setAcompForm((f) => ({ ...f, dataFim: v }))} />
                     <Field label="Próxima consulta prevista" type="date" value={acompForm.proximaConsultaPrevista} onChange={(v) => setAcompForm((f) => ({ ...f, proximaConsultaPrevista: v }))} />
-                    <Field label="Último contato" type="date" value={acompForm.ultimoContato} onChange={(v) => setAcompForm((f) => ({ ...f, ultimoContato: v }))} />
                     <Field label="Consultas realizadas" type="number" value={acompForm.consultasRealizadas} onChange={(v) => setAcompForm((f) => ({ ...f, consultasRealizadas: v }))} />
                     <Field label="Consultas total" type="number" value={acompForm.consultasTotal} onChange={(v) => setAcompForm((f) => ({ ...f, consultasTotal: v }))} />
                     <Field label="Valor total (R$)" type="number" value={acompForm.valor} onChange={(v) => setAcompForm((f) => ({ ...f, valor: v }))} />
@@ -3040,15 +4189,42 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                 <>
                   <div style={styles.divider} />
                   <div style={styles.miniTitle}>Histórico de pagamentos</div>
-                  {patient.pagamentos.slice().reverse().map((pg) => (
-                    <div key={pg.id} style={styles.evoRow} className="evo-row">
-                      <div style={{ fontSize: 12, color: "#9C9284", width: 90 }}>{formatData(pg.data)}</div>
-                      <div style={{ fontSize: 13, color: "#867A6E", fontWeight: 600, width: 100 }}>{formatMoeda(pg.valor)}</div>
-                      <div style={{ fontSize: 13, color: "#6E6355" }}>
-                        {pg.formaPagamento}{pg.tipo === "avulso" ? " · Avulso" : ""}
+                  {patient.pagamentos.slice().reverse().map((pg) => {
+                    if (pagamentoEditandoId === pg.id) {
+                      return (
+                        <div key={pg.id} style={{ ...styles.panel, marginBottom: 8 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                            <Field label="Data" type="date" value={pagamentoEditForm.data} onChange={(v) => setPagamentoEditForm((f) => ({ ...f, data: v }))} />
+                            <Field label="Valor (R$)" type="number" value={pagamentoEditForm.valor} onChange={(v) => setPagamentoEditForm((f) => ({ ...f, valor: v }))} />
+                            <Field label="Forma" type="select" options={["Pix", "Cartão", "Boleto", "Dinheiro"]} value={pagamentoEditForm.formaPagamento} onChange={(v) => setPagamentoEditForm((f) => ({ ...f, formaPagamento: v }))} />
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+                            <button style={styles.secondaryBtn} onClick={() => setPagamentoEditandoId(null)}>Cancelar</button>
+                            <button style={styles.primaryBtn} onClick={salvarEdicaoPagamento}>Salvar</button>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={pg.id} style={styles.evoRow} className="evo-row">
+                        <div style={{ fontSize: 12, color: "#9C9284", width: 90 }}>{formatData(pg.data)}</div>
+                        <div style={{ fontSize: 13, color: "#867A6E", fontWeight: 600, width: 100 }}>{formatMoeda(pg.valor)}</div>
+                        <div style={{ fontSize: 13, color: "#6E6355", flex: 1 }}>
+                          {pg.formaPagamento}{pg.tipo === "avulso" ? " · Avulso" : ""}
+                        </div>
+                        <button title="Editar pagamento" onClick={() => iniciarEdicaoPagamento(pg)} style={{ background: "none", border: "none", color: "#9C9284", cursor: "pointer", display: "flex", padding: 2 }}>
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          title="Excluir pagamento"
+                          onClick={() => { if (window.confirm("Excluir este pagamento? Ele deixará de contar na receita recebida.")) onExcluirPagamento(pg.id); }}
+                          style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", display: "flex", padding: 2 }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </>
               )}
             </div>
@@ -3086,16 +4262,14 @@ function InfoGrid({ items }) {
   );
 }
 
-function NewPatientModal({ onClose, onSave, prospeccaoInicial }) {
+function NewPatientModal({ onClose, onSave, patients }) {
   const [form, setForm] = useState({
     nome: "", dataNascimento: "", sexo: "F", escola: "", diagnostico: "",
     alergias: "", medicamentos: "", pediatra: "", responsavel: "",
     telefone: "", whatsapp: "", email: "", endereco: "", tags: "", origem: "",
     dificuldadeAlimentar: "", corFavorita: "", personagensFavoritos: "", observacoes: "",
-    statusNegociacao: "",
     status: "ativo", ultimoContato: new Date().toISOString().slice(0, 10)
   });
-  const [prospeccao, setProspeccao] = useState(!!prospeccaoInicial);
   const [whatsappIgual, setWhatsappIgual] = useState(true);
   const [showMais, setShowMais] = useState(false);
   const [erro, setErro] = useState("");
@@ -3118,18 +4292,19 @@ function NewPatientModal({ onClose, onSave, prospeccaoInicial }) {
   };
 
   const submit = () => {
-    if (prospeccao) {
-      if (!form.nome.trim() && !form.responsavel.trim()) {
-        setErro("Informe ao menos o nome da mãe/responsável ou da criança.");
-        return;
-      }
-      if (!form.telefone.trim()) {
-        setErro("Informe o telefone/WhatsApp do contato.");
-        return;
-      }
-    } else if (!form.nome.trim()) {
+    if (!form.nome.trim()) {
       setErro("Informe o nome da criança para salvar.");
       return;
+    }
+    const telefoneNovo = (form.telefone || "").replace(/\D/g, "");
+    if (telefoneNovo.length >= 8) {
+      const duplicado = (patients || []).find((p) => (p.telefone || "").replace(/\D/g, "") === telefoneNovo);
+      if (duplicado) {
+        const seguir = window.confirm(
+          `Já existe uma paciente cadastrada com esse telefone: ${duplicado.nome}. Deseja cadastrar mesmo assim (ex.: irmãos que compartilham o telefone da família)?`
+        );
+        if (!seguir) return;
+      }
     }
     onSave({
       ...form,
@@ -3138,24 +4313,12 @@ function NewPatientModal({ onClose, onSave, prospeccaoInicial }) {
       pagamentos: [],
       evolucao: [],
       sessoes: [],
-      status: prospeccao ? "prospect" : "ativo",
-      statusNegociacao: prospeccao ? form.statusNegociacao : "",
-      timeline: [{
-        data: new Date().toISOString().slice(0, 10), tipo: "nota",
-        texto: prospeccao
-          ? `Contato de prospecção registrado no sistema.${form.observacoes.trim() ? ` ${form.observacoes.trim()}` : ""}`
-          : "Paciente cadastrado no sistema."
-      }],
-      acompanhamento: prospeccao
-        ? {
-            tipoId: "avulso", tipo: "Prospecção", dataInicio: "", dataFim: "",
-            consultasTotal: 0, consultasRealizadas: 0, valor: 0, formaPagamento: "Pix", parcelas: 1, status: "prospect"
-          }
-        : {
-            tipoId: "avulso", tipo: "Consulta avulsa", dataInicio: new Date().toISOString().slice(0, 10),
-            dataFim: "", consultasTotal: 1, consultasRealizadas: 0, valor: 0,
-            formaPagamento: "Pix", parcelas: 1, status: "ativo"
-          }
+      timeline: [{ data: new Date().toISOString().slice(0, 10), tipo: "nota", texto: "Paciente cadastrado no sistema." }],
+      acompanhamento: {
+        tipoId: "avulso", tipo: "Consulta avulsa", dataInicio: new Date().toISOString().slice(0, 10),
+        dataFim: "", consultasTotal: 1, consultasRealizadas: 0, valor: 0,
+        formaPagamento: "Pix", parcelas: 1, status: "ativo"
+      }
     });
   };
 
@@ -3164,29 +4327,12 @@ function NewPatientModal({ onClose, onSave, prospeccaoInicial }) {
       <div style={styles.modal} className="modal" onClick={(e) => e.stopPropagation()}>
         <div style={styles.drawerHeader} className="drawer-header">
           <div style={{ fontFamily: "Playfair Display, serif", fontSize: 20, fontWeight: 600, color: "#867A6E" }}>
-            {prospeccao ? "Nova prospecção" : "Novo paciente"}
+            Novo paciente
           </div>
           <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
-        <div style={{ padding: "16px 24px 0" }}>
-          <label style={{
-            display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#6E6355",
-            background: "#F7F1E6", border: "1px solid #E3DACB", borderRadius: 10, padding: "10px 12px", cursor: "pointer"
-          }}>
-            <input
-              type="checkbox"
-              checked={prospeccao}
-              onChange={(e) => { setProspeccao(e.target.checked); if (erro) setErro(""); }}
-            />
-            Ainda não é cliente — é só um contato (prospecção)
-          </label>
-        </div>
         <div className="new-patient-grid" style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, overflowY: "auto" }}>
-          <Field
-            label={prospeccao ? "Nome da criança (se souber)" : "Nome da criança *"}
-            value={form.nome} onChange={(v) => { set("nome", v); if (erro) setErro(""); }} full
-            error={erro}
-          />
+          <Field label="Nome da criança *" value={form.nome} onChange={(v) => { set("nome", v); if (erro) setErro(""); }} full error={erro} />
           <Field label="Data de nascimento" type="date" value={form.dataNascimento} onChange={(v) => { set("dataNascimento", v); setIdadeAnos(""); setIdadeMeses(""); }} />
           <div>
             <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>
@@ -3208,40 +4354,8 @@ function NewPatientModal({ onClose, onSave, prospeccaoInicial }) {
             </div>
           </div>
           <Field label="Sexo" type="select" options={["F", "M"]} value={form.sexo} onChange={(v) => set("sexo", v)} />
-          <Field
-            label={prospeccao ? "Nome da mãe/responsável *" : "Responsável"}
-            value={form.responsavel} onChange={(v) => { set("responsavel", v); if (erro) setErro(""); }} full
-          />
-          <Field
-            label={prospeccao ? "Telefone / WhatsApp *" : "Telefone / WhatsApp"}
-            value={form.telefone} onChange={(v) => { setTelefone(v); if (erro) setErro(""); }}
-          />
-          <Field label="Origem do contato" type="select" options={["", ...ORIGEM_OPCOES]} value={form.origem} onChange={(v) => set("origem", v)} />
-          {prospeccao && (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>
-                Status da negociação
-              </div>
-              <input
-                list="negociacao-sugestoes-novo"
-                value={form.statusNegociacao}
-                onChange={(e) => set("statusNegociacao", e.target.value)}
-                style={styles.input}
-                placeholder="Ex.: Interessada, aguardando retorno..."
-              />
-              <datalist id="negociacao-sugestoes-novo">
-                {NEGOCIACAO_SUGESTOES.map((s) => <option key={s} value={s} />)}
-              </datalist>
-            </div>
-          )}
-          {prospeccao && (
-            <Field
-              label="O que ela perguntou / observação da conversa"
-              value={form.observacoes}
-              onChange={(v) => set("observacoes", v)}
-              full
-            />
-          )}
+          <Field label="Responsável" value={form.responsavel} onChange={(v) => set("responsavel", v)} full />
+          <Field label="Telefone / WhatsApp" value={form.telefone} onChange={setTelefone} />
 
           <div>
             <div style={{ fontSize: 11, color: "#9C9284", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>WhatsApp</div>
@@ -3281,6 +4395,7 @@ function NewPatientModal({ onClose, onSave, prospeccaoInicial }) {
               <Field label="Personagens favoritos" value={form.personagensFavoritos} onChange={(v) => set("personagensFavoritos", v)} />
               <Field label="E-mail" value={form.email} onChange={(v) => set("email", v)} />
               <Field label="Endereço" value={form.endereco} onChange={(v) => set("endereco", v)} />
+              <Field label="Origem" type="select" options={["", ...ORIGEM_OPCOES]} value={form.origem} onChange={(v) => set("origem", v)} />
               <Field label="Tags (separadas por vírgula)" value={form.tags} onChange={(v) => set("tags", v)} full />
             </>
           )}
@@ -3311,14 +4426,21 @@ function Field({ label, value, onChange, type = "text", options, full, error }) 
   );
 }
 
-function Agenda({ patients, events, onAdd, onUpdate, onDelete }) {
+function Agenda({ patients, events, onAdd, onUpdate, onDelete, onOpen }) {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [ordenacaoAgenda, setOrdenacaoAgenda] = useState("horario");
+  const [periodoAgenda, setPeriodoAgenda] = useState("proximos");
+  const [buscaAgenda, setBuscaAgenda] = useState("");
 
   const patientName = (id) => patients.find((p) => p.id === id)?.nome || "—";
+  const hoje = new Date().toISOString().slice(0, 10);
 
-  const ordenados = [...events].sort((a, b) => (a.data + (a.hora || "")).localeCompare(b.data + (b.hora || "")));
+  const eventosFiltrados = events
+    .filter((e) => periodoAgenda === "todos" || e.data >= hoje)
+    .filter((e) => !buscaAgenda || patientName(e.pacienteId).toLowerCase().includes(buscaAgenda.toLowerCase()));
+
+  const ordenados = [...eventosFiltrados].sort((a, b) => (a.data + (a.hora || "")).localeCompare(b.data + (b.hora || "")));
   const porData = ordenados.reduce((acc, e) => {
     acc[e.data] = acc[e.data] || [];
     acc[e.data].push(e);
@@ -3341,7 +4463,27 @@ function Agenda({ patients, events, onAdd, onUpdate, onDelete }) {
           </button>
         }
       />
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12, color: "#9C9284", fontWeight: 600 }}>Mostrar:</span>
+        {[
+          { id: "proximos", label: "A partir de hoje" },
+          { id: "todos", label: "Todos, incluindo passados" }
+        ].map((o) => (
+          <button
+            key={o.id}
+            onClick={() => setPeriodoAgenda(o.id)}
+            style={{
+              padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
+              border: `1px solid ${periodoAgenda === o.id ? "#918567" : "#E3DACB"}`,
+              background: periodoAgenda === o.id ? "#EFE6D8" : "#FFFFFF",
+              color: periodoAgenda === o.id ? "#867A6E" : "#9C9284"
+            }}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
         <span style={{ fontSize: 12, color: "#9C9284", fontWeight: 600 }}>Ordenar por:</span>
         {[
           { id: "horario", label: "Horário" },
@@ -3360,6 +4502,10 @@ function Agenda({ patients, events, onAdd, onUpdate, onDelete }) {
             {o.label}
           </button>
         ))}
+        <input
+          value={buscaAgenda} onChange={(e) => setBuscaAgenda(e.target.value)} placeholder="Buscar paciente…"
+          style={{ ...styles.input, maxWidth: 220, marginLeft: "auto" }}
+        />
       </div>
       <div style={styles.panel}>
         {Object.keys(porData).length === 0 && <div style={styles.emptyRow}>Nenhum evento agendado.</div>}
@@ -3369,8 +4515,8 @@ function Agenda({ patients, events, onAdd, onUpdate, onDelete }) {
               {new Date(data + "T00:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
             </div>
             {lista.map((e) => (
-              <div key={e.id} style={styles.agendaRow} className="agenda-row">
-                <CalendarIcon size={15} color={EVENT_STATUS_COLOR[e.status]} />
+              <div key={e.id} style={{ ...styles.agendaRow, cursor: "pointer" }} className="agenda-row" onClick={() => onOpen(e.pacienteId)}>
+                <Calendar size={15} color={EVENT_STATUS_COLOR[e.status]} />
                 <div className="agenda-name" style={{ fontWeight: 600, color: "#867A6E", width: 180 }}>
                   {patientName(e.pacienteId)}
                   {e.hora && <span style={{ color: "#9C9284", fontWeight: 400 }}> · {e.hora}</span>}
@@ -3382,7 +4528,7 @@ function Agenda({ patients, events, onAdd, onUpdate, onDelete }) {
                 }}>
                   {EVENT_STATUS_LABEL[e.status]}
                 </span>
-                <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
+                <div style={{ display: "flex", gap: 4, marginLeft: "auto" }} onClick={(ev) => ev.stopPropagation()}>
                   {e.status === "agendado" && (
                     <button
                       title="Marcar como realizado"
@@ -3477,171 +4623,29 @@ function EventModal({ patients, event, onClose, onSave }) {
   );
 }
 
-function FollowupsBoard({ followups, patients, onMove, onUpdate, onAdd, onDelete, onCriarProspeccao, onNovaProspeccao }) {
+function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarProspeccao, onOpen, abaInicial }) {
+  const hojeFollowup = new Date().toISOString().slice(0, 10);
   const [showModal, setShowModal] = useState(false);
-  const [aba, setAba] = useState("atrasadas");
-  const [ordenacao, setOrdenacao] = useState("padrao");
-  const [historico, setHistorico] = useState({});
+  // Duas listas separadas: "clientes" (pacientes ativos, inativos ou com alta) e
+  // "prospeccao" (quem ainda não fechou). A separação segue o status atual da pessoa,
+  // então quando uma prospecção fecha acompanhamento, os follow-ups dela passam
+  // automaticamente para a aba Clientes.
+  const [aba, setAba] = useState(abaInicial === "prospeccao" ? "prospeccao" : "clientes");
+  useEffect(() => { if (abaInicial) setAba(abaInicial === "prospeccao" ? "prospeccao" : "clientes"); }, [abaInicial]);
   const patientOf = (id) => patients.find((p) => p.id === id);
   const patientName = (id) => patientOf(id)?.nome || "—";
   const mensagemReativacao = (p) =>
     `Oiê ${p?.responsavel || ""}! Passando para saber se ainda tem interesse em agendar aquela conversa sobre a alimentação da ${p?.nome || ""}. Continuo à disposição quando quiser retomar! 💛`;
   const mensagemConsultaAtrasada = (p) =>
-    p?.acompanhamento?.tipoId === "introducao_alimentar"
-      ? "Olá, bom diaa! Como estão?\n\nAlguma dúvida por aí? Tudo certinho?🥰"
-      : "Olá, bom diaa! Como estão?\n\nComo estamos com os combinados por aí? 🥰";
+    `Oiê ${p?.responsavel || ""}! Passando para saber se conseguiu pensar em um horário para o retorno da ${p?.nome || ""}. Qualquer horário, me avisa! 💛`;
   const mensagemPara = (f, p) => (f.tipo === "Consulta atrasada" ? mensagemConsultaAtrasada(p) : mensagemReativacao(p));
 
-  const naoConcluidos = followups.filter((f) => f.coluna !== "concluido");
-  const contagemProspeccao = naoConcluidos.filter((f) => patientOf(f.pacienteId)?.status === "prospect").length;
-  const contagemAtrasadas = naoConcluidos.length - contagemProspeccao;
-  const followupsFiltrados = naoConcluidos.filter((f) => {
-    const ehProspeccao = patientOf(f.pacienteId)?.status === "prospect";
-    return aba === "prospeccao" ? ehProspeccao : !ehProspeccao;
-  });
-
-  const PRIORIDADE_ORDEM = { alta: 0, media: 1, baixa: 2 };
-  const ordenar = (lista) => {
-    const copia = [...lista];
-    if (ordenacao === "nome") {
-      copia.sort((a, b) => patientName(a.pacienteId).localeCompare(patientName(b.pacienteId), "pt-BR"));
-    } else if (ordenacao === "contato") {
-      copia.sort((a, b) => new Date(b.contatadoEm || 0) - new Date(a.contatadoEm || 0));
-    } else if (ordenacao === "idade") {
-      copia.sort((a, b) => {
-        const na = patientOf(a.pacienteId)?.dataNascimento, nb = patientOf(b.pacienteId)?.dataNascimento;
-        if (!na && !nb) return 0;
-        if (!na) return 1;
-        if (!nb) return -1;
-        return new Date(na) - new Date(nb);
-      });
-    } else {
-      copia.sort((a, b) => (PRIORIDADE_ORDEM[a.prioridade] ?? 1) - (PRIORIDADE_ORDEM[b.prioridade] ?? 1) || new Date(a.prazo || 0) - new Date(b.prazo || 0));
-    }
-    return copia;
-  };
-
-  const aindaNaoConversou = ordenar(followupsFiltrados.filter((f) => !f.contatadoEm));
-  const jaConversou = ordenar(followupsFiltrados.filter((f) => f.contatadoEm));
-
-  const marcarContato = (f) => {
-    if (!onUpdate) return;
-    onUpdate(f.id, { contatadoEm: new Date().toISOString().slice(0, 10) });
-  };
-
-  const alternarHistorico = (f) => {
-    setHistorico((prev) => {
-      if (prev[f.id]) {
-        const copia = { ...prev };
-        delete copia[f.id];
-        return copia;
-      }
-      return { ...prev, [f.id]: "carregando" };
-    });
-    if (historico[f.id]) return;
-    supabaseClient.from("whatsapp_log").select("*").eq("paciente_id", f.pacienteId)
-      .order("criado_em", { ascending: false }).limit(10)
-      .then(({ data }) => setHistorico((prev) => ({ ...prev, [f.id]: data || [] })))
-      .catch(() => setHistorico((prev) => ({ ...prev, [f.id]: [] })));
-  };
-
-  const renderCard = (f) => {
-    const paciente = patientOf(f.pacienteId);
-    const linkWpp = paciente ? linkWhatsApp(paciente.whatsapp || paciente.telefone, f.mensagemSugerida || mensagemPara(f, paciente)) : null;
-    return (
-      <div key={f.id} style={styles.kanbanCard}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#867A6E" }}>{f.titulo}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: 8, background: PRIORIDADE_COLOR[f.prioridade], marginTop: 4 }} />
-            <button
-              title="Marcar como concluído"
-              onClick={() => onMove(f.id, "concluido")}
-              style={{ background: "none", border: "none", color: "#9C9284", cursor: "pointer", padding: 0, display: "flex" }}
-            >
-              <CheckCircle2 size={14} />
-            </button>
-            <button
-              title="Excluir follow-up"
-              onClick={() => { if (window.confirm("Excluir este follow-up? Essa ação não pode ser desfeita.")) onDelete(f.id); }}
-              style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", padding: 0, display: "flex" }}
-            >
-              <Trash2 size={13} />
-            </button>
-          </div>
-        </div>
-        <div style={{ fontSize: 12, color: "#9C9284", marginTop: 4 }}>
-          {patientName(f.pacienteId)}{paciente?.dataNascimento ? ` · ${calcIdade(paciente.dataNascimento)}` : ""}
-        </div>
-        {f.contatadoEm ? (
-          <div style={{ fontSize: 11, color: "#7C9885", marginTop: 6, fontWeight: 600 }}>
-            Conversei em {formatData(f.contatadoEm)}
-          </div>
-        ) : (
-          <div style={{ fontSize: 11, color: "#9C9284", marginTop: 6 }}>
-            Prazo {formatData(f.prazo)} · {f.responsavel}
-          </div>
-        )}
-        {linkWpp && (
-          <a
-            href={linkWpp}
-            onClick={(e) => { abrirWhatsApp(e, linkWpp); marcarContato(f); }}
-            style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, color: "#918567", fontWeight: 600, textDecoration: "none" }}
-          >
-            <MessageCircle size={13} /> {f.tipo === "Consulta atrasada" ? "Cobrar retorno por WhatsApp" : "Reativar por WhatsApp"}
-          </a>
-        )}
-        {f.contatadoEm && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {ETIQUETAS_CONTATO.map((et) => (
-                <button
-                  key={et.id}
-                  onClick={() => onUpdate(f.id, { etiquetaContato: f.etiquetaContato === et.id ? "" : et.id })}
-                  style={{
-                    fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 12, cursor: "pointer",
-                    border: `1px solid ${f.etiquetaContato === et.id ? et.color : "#E3DACB"}`,
-                    background: f.etiquetaContato === et.id ? et.color : "#FFFFFF",
-                    color: f.etiquetaContato === et.id ? "#FFFFFF" : "#6E6355"
-                  }}
-                >
-                  {et.label}
-                </button>
-              ))}
-            </div>
-            <input
-              type="text" placeholder="O que aconteceu? (opcional)"
-              defaultValue={f.notaContato || ""}
-              onBlur={(e) => { if (e.target.value !== (f.notaContato || "")) onUpdate(f.id, { notaContato: e.target.value }); }}
-              style={{ fontSize: 12, padding: "6px 8px", borderRadius: 8, border: "1px solid #E3DACB", background: "#FBF8F2" }}
-            />
-          </div>
-        )}
-        <button
-          onClick={() => alternarHistorico(f)}
-          style={{ background: "none", border: "none", color: "#918567", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: 0, marginTop: 8, textAlign: "left" }}
-        >
-          {historico[f.id] ? "Ocultar histórico do WhatsApp" : "Ver histórico do WhatsApp"}
-        </button>
-        {historico[f.id] === "carregando" && (
-          <div style={{ fontSize: 11, color: "#C9BFAE", marginTop: 4 }}>Carregando...</div>
-        )}
-        {Array.isArray(historico[f.id]) && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6, maxHeight: 160, overflowY: "auto" }}>
-            {historico[f.id].length === 0 && <div style={{ fontSize: 11, color: "#C9BFAE" }}>Nenhuma conversa registrada ainda.</div>}
-            {historico[f.id].map((log) => (
-              <div key={log.id} style={{ fontSize: 11, background: "#FBF8F2", borderRadius: 6, padding: "5px 7px" }}>
-                <div style={{ color: "#9C9284", fontWeight: 600 }}>
-                  {log.de === "sistema" ? "Você/sistema" : "Paciente"} · {new Date(log.criado_em).toLocaleString("pt-BR")}
-                </div>
-                <div style={{ color: "#6E6355" }}>{log.resposta_enviada || log.mensagem_recebida}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
+  const ehDeProspeccao = (f) => patientOf(f.pacienteId)?.status === "prospect";
+  const pendente = (f) => f.coluna !== "concluido";
+  const contagemProspeccao = followups.filter((f) => ehDeProspeccao(f) && pendente(f)).length;
+  const contagemClientes = followups.filter((f) => !ehDeProspeccao(f) && pendente(f)).length;
+  const followupsFiltrados = followups.filter((f) => (aba === "prospeccao" ? ehDeProspeccao(f) : !ehDeProspeccao(f)));
+  const pacientesDaAba = patients.filter((p) => (aba === "prospeccao" ? p.status === "prospect" : p.status !== "prospect"));
 
   return (
     <div>
@@ -3650,9 +4654,6 @@ function FollowupsBoard({ followups, patients, onMove, onUpdate, onAdd, onDelete
         subtitle="Tarefas de relacionamento e cobrança"
         action={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button style={styles.secondaryBtn} onClick={onNovaProspeccao}>
-              <Plus size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Nova prospecção
-            </button>
             <button style={styles.secondaryBtn} onClick={onCriarProspeccao}>
               <Clock size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Follow-up p/ prospecções (1 semana)
             </button>
@@ -3662,60 +4663,101 @@ function FollowupsBoard({ followups, patients, onMove, onUpdate, onAdd, onDelete
           </div>
         }
       />
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          {[
-            { id: "atrasadas", label: "Consultas atrasadas", count: contagemAtrasadas },
-            { id: "prospeccao", label: "Prospecção", count: contagemProspeccao }
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setAba(t.id)}
-              style={{
-                padding: "8px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer",
-                border: `1px solid ${aba === t.id ? "#867A6E" : "#E3DACB"}`,
-                background: aba === t.id ? "#867A6E" : "#FFFFFF",
-                color: aba === t.id ? "#FFFFFF" : "#6E6355"
-              }}
-            >
-              {t.label} ({t.count})
-            </button>
-          ))}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#6E6355" }}>
-          Ordenar por:
-          <select value={ordenacao} onChange={(e) => setOrdenacao(e.target.value)} style={styles.kanbanSelect}>
-            <option value="padrao">Prioridade</option>
-            <option value="nome">Ordem alfabética</option>
-            <option value="contato">Data da última conversa</option>
-            <option value="idade">Idade</option>
-          </select>
-        </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {[
+          { id: "clientes", label: "Clientes", count: contagemClientes },
+          { id: "prospeccao", label: "Prospecção", count: contagemProspeccao }
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setAba(t.id)}
+            style={{
+              padding: "8px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer",
+              border: `1px solid ${aba === t.id ? "#867A6E" : "#E3DACB"}`,
+              background: aba === t.id ? "#867A6E" : "#FFFFFF",
+              color: aba === t.id ? "#FFFFFF" : "#6E6355"
+            }}
+          >
+            {t.label} ({t.count} pendente{t.count === 1 ? "" : "s"})
+          </button>
+        ))}
+      </div>
+      <div style={{ fontSize: 12, color: "#9C9284", marginTop: -8, marginBottom: 14 }}>
+        {aba === "prospeccao"
+          ? "Pessoas que ainda não fecharam acompanhamento. Ao fechar, os follow-ups delas passam para Clientes automaticamente."
+          : "Pacientes ativos, inativos ou que receberam alta: retornos, cobranças e relacionamento."}
       </div>
       <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 8 }}>
-        <div style={styles.kanbanCol} className="kanban-col">
-          <div style={styles.kanbanColHeader}>
-            Ainda não conversei <span style={{ color: "#9C9284", fontWeight: 400 }}>({aindaNaoConversou.length})</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {aindaNaoConversou.map(renderCard)}
-            {aindaNaoConversou.length === 0 && <div style={{ fontSize: 12, color: "#C9BFAE", padding: "8px 0" }}>Sem tarefas</div>}
-          </div>
-        </div>
-        <div style={styles.kanbanCol} className="kanban-col">
-          <div style={styles.kanbanColHeader}>
-            Já conversei <span style={{ color: "#9C9284", fontWeight: 400 }}>({jaConversou.length})</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {jaConversou.map(renderCard)}
-            {jaConversou.length === 0 && <div style={{ fontSize: 12, color: "#C9BFAE", padding: "8px 0" }}>Sem conversas ainda</div>}
-          </div>
-        </div>
+        {KANBAN_COLS.map((col) => {
+          const items = followupsFiltrados.filter((f) => f.coluna === col.id);
+          return (
+            <div key={col.id} style={styles.kanbanCol} className="kanban-col">
+              <div style={styles.kanbanColHeader}>
+                {col.label} <span style={{ color: "#9C9284", fontWeight: 400 }}>({items.length})</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {items.map((f) => {
+                  const paciente = patientOf(f.pacienteId);
+                  const linkWpp = paciente ? linkWhatsApp(paciente.whatsapp || paciente.telefone, f.mensagemSugerida || mensagemPara(f, paciente)) : null;
+                  const prazoVencido = f.coluna !== "concluido" && f.prazo && f.prazo < hojeFollowup;
+                  return (
+                    <div key={f.id} style={{ ...styles.kanbanCard, ...(prazoVencido ? { border: "1px solid #E6C7BA", background: "#FBF3EF" } : {}) }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div
+                          style={{ fontSize: 13, fontWeight: 600, color: "#867A6E", cursor: patientOf(f.pacienteId) ? "pointer" : "default" }}
+                          onClick={() => patientOf(f.pacienteId) && onOpen(f.pacienteId)}
+                        >
+                          {f.titulo}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: 8, background: PRIORIDADE_COLOR[f.prioridade], marginTop: 4 }} />
+                          <button
+                            title="Excluir follow-up"
+                            onClick={() => { if (window.confirm("Excluir este follow-up? Essa ação não pode ser desfeita.")) onDelete(f.id); }}
+                            style={{ background: "none", border: "none", color: "#CFC7B6", cursor: "pointer", padding: 0, display: "flex" }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        style={{ fontSize: 12, color: "#9C9284", marginTop: 4, cursor: patientOf(f.pacienteId) ? "pointer" : "default" }}
+                        onClick={() => patientOf(f.pacienteId) && onOpen(f.pacienteId)}
+                      >
+                        {patientName(f.pacienteId)}
+                      </div>
+                      <div style={{ fontSize: 11, color: prazoVencido ? "#B4644A" : "#9C9284", fontWeight: prazoVencido ? 700 : 400, marginTop: 6 }}>
+                        {prazoVencido ? "Prazo vencido em " : "Prazo "}{formatData(f.prazo)} · {f.responsavel}
+                      </div>
+                      {linkWpp && (
+                        <a
+                          href={linkWpp} target="_blank" rel="noopener noreferrer"
+                          style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, color: "#918567", fontWeight: 600, textDecoration: "none" }}
+                        >
+                          <MessageCircle size={13} /> {f.tipo === "Consulta atrasada" ? "Cobrar retorno por WhatsApp" : "Reativar por WhatsApp"}
+                        </a>
+                      )}
+                      <select
+                        value={f.coluna}
+                        onChange={(e) => onMove(f.id, e.target.value)}
+                        style={styles.kanbanSelect}
+                      >
+                        {KANBAN_COLS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                      </select>
+                    </div>
+                  );
+                })}
+                {items.length === 0 && <div style={{ fontSize: 12, color: "#C9BFAE", padding: "8px 0" }}>Sem tarefas</div>}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {showModal && (
         <FollowupModal
-          patients={patients}
+          patients={pacientesDaAba}
+          tipoPadrao={aba === "prospeccao" ? "Fazer follow-up" : "Cobrar retorno"}
           onClose={() => setShowModal(false)}
           onSave={(f) => { onAdd(f); setShowModal(false); }}
         />
@@ -3724,9 +4766,9 @@ function FollowupsBoard({ followups, patients, onMove, onUpdate, onAdd, onDelete
   );
 }
 
-function FollowupModal({ patients, onClose, onSave }) {
+function FollowupModal({ patients, onClose, onSave, tipoPadrao }) {
   const [form, setForm] = useState({
-    pacienteId: patients[0]?.id || "", titulo: "", tipo: "Cobrar retorno", prioridade: "media",
+    pacienteId: "", titulo: "", tipo: tipoPadrao || "Cobrar retorno", prioridade: "media",
     prazo: new Date().toISOString().slice(0, 10), coluna: "afazer", responsavel: "Nutricionista"
   });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -3741,9 +4783,9 @@ function FollowupModal({ patients, onClose, onSave }) {
           <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
         <div className="new-patient-grid" style={{ padding: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Field label="Paciente" type="select" full options={patients.map((p) => p.nome)}
-            value={patients.find((p) => p.id === form.pacienteId)?.nome || ""}
-            onChange={(nome) => set("pacienteId", patients.find((p) => p.nome === nome)?.id)} />
+          <Field label="Paciente" type="select" full options={["Selecione a paciente", ...patients.map((p) => p.nome)]}
+            value={patients.find((p) => p.id === form.pacienteId)?.nome || "Selecione a paciente"}
+            onChange={(nome) => set("pacienteId", patients.find((p) => p.nome === nome)?.id || "")} />
           <Field label="Título" full value={form.titulo} onChange={(v) => set("titulo", v)} />
           <Field label="Tipo" value={form.tipo} onChange={(v) => set("tipo", v)} />
           <Field label="Prazo" type="date" value={form.prazo} onChange={(v) => set("prazo", v)} />
@@ -3751,7 +4793,7 @@ function FollowupModal({ patients, onClose, onSave }) {
             value={PRIORIDADE_LABEL[form.prioridade]}
             onChange={(label) => set("prioridade", Object.keys(PRIORIDADE_LABEL).find((k) => PRIORIDADE_LABEL[k] === label))} />
           <Field label="Responsável" value={form.responsavel} onChange={(v) => set("responsavel", v)} />
-          <Field label="Status" type="select" options={KANBAN_COLS.map((c) => c.label)}
+          <Field label="Coluna" type="select" options={KANBAN_COLS.map((c) => c.label)}
             value={KANBAN_COLS.find((c) => c.id === form.coluna)?.label || ""}
             onChange={(label) => set("coluna", KANBAN_COLS.find((c) => c.label === label)?.id)} />
         </div>
@@ -3764,21 +4806,26 @@ function FollowupModal({ patients, onClose, onSave }) {
   );
 }
 
-function Financeiro({ patients, onAddPagamento }) {
+function Financeiro({ patients, onAddPagamento, onOpen }) {
   const [paymentTarget, setPaymentTarget] = useState(null);
+  const [busca, setBusca] = useState("");
+  const [somenteVencidos, setSomenteVencidos] = useState(false);
 
+  const hoje = new Date().toISOString().slice(0, 10);
   const rows = patients.filter((p) => p.status !== "prospect").map((p) => {
     const pagamentos = p.pagamentos || [];
     const recebidoPlano = pagamentos.filter((pg) => pg.tipo !== "avulso").reduce((s, pg) => s + pg.valor, 0);
     const recebidoAvulso = pagamentos.filter((pg) => pg.tipo === "avulso").reduce((s, pg) => s + pg.valor, 0);
     const previsto = p.acompanhamento?.valor || 0;
     const pendente = Math.max(0, previsto - recebidoPlano);
-    return { ...p, recebidoPlano, recebidoAvulso, recebidoTotal: recebidoPlano + recebidoAvulso, pendente };
-  });
+    const vencido = pendente > 0 && p.acompanhamento?.dataFim && p.acompanhamento.dataFim < hoje;
+    return { ...p, recebidoPlano, recebidoAvulso, recebidoTotal: recebidoPlano + recebidoAvulso, pendente, vencido };
+  }).filter((r) => (!busca || r.nome.toLowerCase().includes(busca.toLowerCase())) && (!somenteVencidos || r.vencido));
 
   const totalPrevisto = rows.reduce((s, r) => s + (r.acompanhamento?.valor || 0), 0);
   const totalRecebido = rows.reduce((s, r) => s + r.recebidoTotal, 0);
   const totalPendente = rows.reduce((s, r) => s + r.pendente, 0);
+  const totalVencidos = rows.filter((r) => r.vencido).length;
 
   const todosPagamentos = rows
     .flatMap((r) => (r.pagamentos || []).map((pg) => ({ ...pg, pacienteNome: r.nome })))
@@ -3789,7 +4836,7 @@ function Financeiro({ patients, onAddPagamento }) {
     <div>
       <SectionTitle title="Financeiro" subtitle="Planos, pagamentos e inadimplência"
         action={
-          <button style={styles.primaryBtn} onClick={() => rows[0] && setPaymentTarget({ patientId: rows[0].id, mode: "avulso" })}>
+          <button style={styles.primaryBtn} onClick={() => setPaymentTarget({ patientId: "", mode: "avulso" })}>
             <Plus size={16} /> Cobrança avulsa
           </button>
         }
@@ -3798,6 +4845,18 @@ function Financeiro({ patients, onAddPagamento }) {
         <MetricCard label="Receita prevista" value={formatMoeda(totalPrevisto)} icon={DollarSign} accent="#867A6E" />
         <MetricCard label="Receita recebida" value={formatMoeda(totalRecebido)} icon={TrendingUp} accent="#918567" />
         <MetricCard label="Receita pendente" value={formatMoeda(totalPendente)} icon={AlertTriangle} accent="#AFA998" />
+        <MetricCard label="Pagamentos vencidos" value={totalVencidos} icon={AlertTriangle} accent="#A99790" onClick={() => setSomenteVencidos((v) => !v)} />
+      </div>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+        <input
+          value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar paciente…"
+          style={{ ...styles.input, maxWidth: 260 }}
+        />
+        {somenteVencidos && (
+          <button style={{ ...styles.secondaryBtn, background: "#F7E6DF", color: "#8A4A34" }} onClick={() => setSomenteVencidos(false)}>
+            Mostrando só vencidos · limpar
+          </button>
+        )}
       </div>
       <div style={styles.panel}>
         <div style={styles.tableHeader} className="table-header">
@@ -3809,14 +4868,22 @@ function Financeiro({ patients, onAddPagamento }) {
           <div style={{ flex: 1 }}>Status</div>
           <div style={{ width: 36 }} />
         </div>
+        {rows.length === 0 && <div style={styles.emptyRow}>Nenhuma paciente encontrada.</div>}
         {rows.map((r) => (
-          <div key={r.id} style={styles.tableRow} className="table-row">
+          <div key={r.id} style={{ ...styles.tableRow, cursor: "pointer" }} className="table-row" onClick={() => onOpen(r.id)}>
             <div style={{ flex: 2, fontWeight: 600, color: "#867A6E" }}>{r.nome}</div>
             <div style={{ flex: 1, fontSize: 13, color: "#6E6355" }} data-label="Plano">{r.acompanhamento?.tipo}</div>
             <div style={{ flex: 1, fontSize: 13, color: "#6E6355" }} data-label="Pagamento">{r.acompanhamento?.formaPagamento} · {r.acompanhamento?.parcelas}x</div>
             <div style={{ flex: 1, fontSize: 13, color: "#918567", fontWeight: 600 }} data-label="Recebido">{formatMoeda(r.recebidoTotal)}</div>
             <div style={{ flex: 1, fontSize: 13, color: "#A99790", fontWeight: 600 }} data-label="Pendente">{formatMoeda(r.pendente)}</div>
-            <div style={{ flex: 1 }} data-label="Status"><StatusPill status={r.status} /></div>
+            <div style={{ flex: 1, display: "flex", gap: 6, alignItems: "center" }} data-label="Status">
+              <StatusPill status={r.status} />
+              {r.vencido && (
+                <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: "#F7E6DF", color: "#8A4A34" }}>
+                  Vencido
+                </span>
+              )}
+            </div>
             <div style={{ width: 36 }} onClick={(e) => e.stopPropagation()}>
               {r.pendente > 0 && (
                 <button title="Registrar pagamento" onClick={() => setPaymentTarget({ patientId: r.id, mode: "parcela" })}
@@ -3855,10 +4922,16 @@ function Financeiro({ patients, onAddPagamento }) {
   );
 }
 
-function Administracao({ patients, contratosModelo, setContratosModelo }) {
+function Administracao({ patients, contratosModelo, setContratosModelo, onOpen }) {
   const [tipoAtivo, setTipoAtivo] = useState("introducao_alimentar");
   const [pacienteSelecionadoId, setPacienteSelecionadoId] = useState("");
   const [textoGerado, setTextoGerado] = useState("");
+  const [buscaComprovantes, setBuscaComprovantes] = useState("");
+
+  const restaurarModeloPadrao = () => {
+    if (!window.confirm("Restaurar o modelo padrão deste tipo de acompanhamento? Suas alterações neste modelo serão perdidas.")) return;
+    setContratosModelo((prev) => ({ ...prev, [tipoAtivo]: CONTRATOS_PADRAO[tipoAtivo] || CONTRATOS_PADRAO.avulso }));
+  };
 
   const salvarModelo = (texto) => {
     setContratosModelo((prev) => ({ ...prev, [tipoAtivo]: texto }));
@@ -3888,7 +4961,7 @@ function Administracao({ patients, contratosModelo, setContratosModelo }) {
   };
 
   const todosPagamentos = patients
-    .flatMap((p) => (p.pagamentos || []).map((pg) => ({ ...pg, pacienteNome: p.nome })))
+    .flatMap((p) => (p.pagamentos || []).map((pg) => ({ ...pg, pacienteNome: p.nome, pacienteId: p.id })))
     .sort((a, b) => (b.data || "").localeCompare(a.data || ""));
 
   return (
@@ -3922,9 +4995,14 @@ function Administracao({ patients, contratosModelo, setContratosModelo }) {
           onChange={(e) => salvarModelo(e.target.value)}
           style={{ ...styles.input, minHeight: 260, resize: "vertical", fontFamily: "monospace", fontSize: 12.5, lineHeight: 1.6 }}
         />
-        <div style={{ fontSize: 11.5, color: "#9C9284", marginTop: 8 }}>
-          Use {"{{nome}}"}, {"{{responsavel}}"}, {"{{duracao}}"}, {"{{dataInicio}}"} e {"{{dataFim}}"} —
-          são preenchidos automaticamente ao gerar o termo de um paciente.
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ fontSize: 11.5, color: "#9C9284" }}>
+            Use {"{{nome}}"}, {"{{responsavel}}"}, {"{{duracao}}"}, {"{{dataInicio}}"} e {"{{dataFim}}"} —
+            são preenchidos automaticamente ao gerar o termo de um paciente.
+          </div>
+          <button style={{ ...styles.secondaryBtn, padding: "5px 10px", fontSize: 12, flexShrink: 0 }} onClick={restaurarModeloPadrao}>
+            Restaurar modelo padrão
+          </button>
         </div>
       </div>
 
@@ -3955,17 +5033,30 @@ function Administracao({ patients, contratosModelo, setContratosModelo }) {
       </div>
 
       <div style={styles.panel}>
-        <div style={styles.panelTitle}>Comprovantes (pagamentos registrados)</div>
-        {todosPagamentos.length === 0 ? (
-          <div style={styles.emptyRow}>Nenhum pagamento registrado ainda.</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+          <div style={styles.panelTitle}>Comprovantes (pagamentos registrados)</div>
+          <input
+            value={buscaComprovantes} onChange={(e) => setBuscaComprovantes(e.target.value)} placeholder="Buscar paciente…"
+            style={{ ...styles.input, maxWidth: 220 }}
+          />
+        </div>
+        {todosPagamentos.filter((pg) => !buscaComprovantes || pg.pacienteNome.toLowerCase().includes(buscaComprovantes.toLowerCase())).length === 0 ? (
+          <div style={styles.emptyRow}>Nenhum pagamento encontrado.</div>
         ) : (
-          todosPagamentos.slice(0, 50).map((pg, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #E3DACB", fontSize: 13 }}>
-              <span style={{ color: "#867A6E", fontWeight: 600 }}>{pg.pacienteNome}</span>
-              <span style={{ color: "#6E6355" }}>{formatData(pg.data)}</span>
-              <span style={{ color: "#918567", fontWeight: 600 }}>{formatMoeda(pg.valor)}</span>
-            </div>
-          ))
+          todosPagamentos
+            .filter((pg) => !buscaComprovantes || pg.pacienteNome.toLowerCase().includes(buscaComprovantes.toLowerCase()))
+            .slice(0, 50)
+            .map((pg, i) => (
+              <div
+                key={i}
+                style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #E3DACB", fontSize: 13, cursor: pg.pacienteId ? "pointer" : "default" }}
+                onClick={() => pg.pacienteId && onOpen(pg.pacienteId)}
+              >
+                <span style={{ color: "#867A6E", fontWeight: 600 }}>{pg.pacienteNome}</span>
+                <span style={{ color: "#6E6355" }}>{formatData(pg.data)}</span>
+                <span style={{ color: "#918567", fontWeight: 600 }}>{formatMoeda(pg.valor)}</span>
+              </div>
+            ))
         )}
       </div>
     </div>
@@ -4001,9 +5092,9 @@ function PaymentModal({ patients, target, onClose, onSave }) {
         </div>
         <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
           {isAvulso && (
-            <Field label="Paciente" type="select" options={patients.map((p) => p.nome)}
-              value={patients.find((p) => p.id === patientId)?.nome || ""}
-              onChange={(nome) => setPatientId(patients.find((p) => p.nome === nome)?.id)} />
+            <Field label="Paciente" type="select" options={["Selecione a paciente", ...patients.map((p) => p.nome)]}
+              value={patients.find((p) => p.id === patientId)?.nome || "Selecione a paciente"}
+              onChange={(nome) => setPatientId(patients.find((p) => p.nome === nome)?.id || "")} />
           )}
           <Field label="Valor (R$)" type="number" value={valor} onChange={setValor} />
           <Field label="Data" type="date" value={data} onChange={setData} />
@@ -4021,7 +5112,7 @@ function PaymentModal({ patients, target, onClose, onSave }) {
 
 function Integracoes({
   googleClientId, setGoogleClientId, googleToken, gisReady, onConectar, onDesconectar, onSincronizarTudo, syncLog,
-  onResetarBase, onSugerirTipos, patients, followups, events, setPatients, setFollowups, setEvents
+  onSugerirTipos, patients, followups, events, setPatients, setFollowups, setEvents
 }) {
   const [inputId, setInputId] = useState(googleClientId);
   const [sincronizando, setSincronizando] = useState(false);
@@ -4048,21 +5139,34 @@ function Integracoes({
 
   const importarBackupJSON = (file) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
+      let data;
       try {
-        const data = JSON.parse(e.target.result);
+        data = JSON.parse(e.target.result);
         if (!data.patients) { window.alert("Arquivo inválido: não parece ser um backup deste CRM."); return; }
-        const confirmar = window.confirm(
-          `Esse backup tem ${data.patients.length} paciente(s), ${(data.followups || []).length} follow-up(s) e ` +
-          `${(data.events || []).length} evento(s) de agenda.\n\nIsso vai SUBSTITUIR todos os dados atuais. Deseja continuar?`
-        );
-        if (!confirmar) return;
-        setPatients(data.patients || []);
-        setFollowups(data.followups || []);
-        setEvents(data.events || []);
-        window.alert("Backup restaurado com sucesso.");
       } catch (err) {
         window.alert("Não foi possível ler o arquivo. Confira se é um backup válido (.json) gerado por este CRM.");
+        return;
+      }
+      const confirmar = window.confirm(
+        `Esse backup tem ${data.patients.length} paciente(s), ${(data.followups || []).length} follow-up(s) e ` +
+        `${(data.events || []).length} evento(s) de agenda.\n\nIsso vai SUBSTITUIR todos os dados atuais, na tela e no banco de dados. Deseja continuar?`
+      );
+      if (!confirmar) return;
+      setPatients(data.patients || []);
+      setFollowups(data.followups || []);
+      setEvents(data.events || []);
+      try {
+        await supabaseClient.from("events").delete().neq("id", "");
+        await supabaseClient.from("followups").delete().neq("id", "");
+        await supabaseClient.from("patients").delete().neq("id", "");
+        if ((data.patients || []).length) await supabaseClient.from("patients").insert(data.patients.map(patientToRow));
+        if ((data.followups || []).length) await supabaseClient.from("followups").insert(data.followups.map(followupToRow));
+        if ((data.events || []).length) await supabaseClient.from("events").insert(data.events.map(eventToRow));
+        window.alert("Backup restaurado e salvo no banco de dados.");
+      } catch (err2) {
+        console.error("Falha ao salvar backup restaurado no Supabase:", err2);
+        window.alert("O backup apareceu na tela, mas não foi possível salvar no banco de dados agora. Se você recarregar a página antes de conseguir salvar, esta restauração será perdida. Tente novamente.");
       }
     };
     reader.readAsText(file);
@@ -4105,18 +5209,11 @@ function Integracoes({
       </div>
 
       <div style={styles.panel}>
-        <div style={styles.panelTitle}>Atualizar base de dados</div>
-        <div style={{ fontSize: 13, color: "#4B615D", lineHeight: 1.7, marginBottom: 12 }}>
-          Sempre que você atualizar os arquivos do CRM no GitHub, o navegador continua mostrando os dados que já
-          tinha salvo localmente (isso é normal). Se os pacientes não aparecerem depois de uma atualização, clique
-          abaixo para recarregar a base original que vem no arquivo mais recente.
-        </div>
-        <button style={styles.secondaryBtn} onClick={onResetarBase}>
-          <RefreshCw size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Recarregar dados originais do arquivo
-        </button>
-        <div style={{ fontSize: 11.5, color: "#A99790", marginTop: 8 }}>
-          Atenção: isso substitui pacientes, agenda e follow-ups pelos dados originais do arquivo, apagando qualquer
-          edição feita depois da última atualização.
+        <div style={styles.panelTitle}>Sobre os dados do CRM</div>
+        <div style={{ fontSize: 13, color: "#4B615D", lineHeight: 1.7 }}>
+          Pacientes, agenda e follow-ups ficam salvos na nuvem (Supabase) e aparecem do mesmo jeito em qualquer
+          computador ou navegador em que você acessar o Crescer. Não há mais dados salvos só localmente neste
+          navegador.
         </div>
       </div>
 
