@@ -319,6 +319,17 @@ const linkWhatsApp = (telefone, mensagem) => {
   return `https://wa.me/${comPais}${texto}`;
 };
 
+let janelaWhatsApp = null;
+const abrirWhatsApp = (e, url) => {
+  if (e) e.preventDefault();
+  if (janelaWhatsApp && !janelaWhatsApp.closed) {
+    janelaWhatsApp.location.href = url;
+    janelaWhatsApp.focus();
+  } else {
+    janelaWhatsApp = window.open(url, "whatsapp_web");
+  }
+};
+
 const linkMapa = (endereco) => {
   if (!endereco || !endereco.trim()) return null;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`;
@@ -1898,7 +1909,7 @@ function Dashboard({ patients, followups, setView, setSelectedId, setFiltroPacie
               {linkWhatsApp(p.whatsapp || p.telefone) && (
                 <a
                   href={linkWhatsApp(p.whatsapp || p.telefone, `Olá, ${p.responsavel || ""}! Passando para desejar um feliz aniversário para a ${p.nome}! 🎂`)}
-                  target="whatsapp_web"
+                  onClick={(e) => abrirWhatsApp(e, linkWhatsApp(p.whatsapp || p.telefone, `Olá, ${p.responsavel || ""}! Passando para desejar um feliz aniversário para a ${p.nome}! 🎂`))}
                   style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#918567", fontWeight: 600, textDecoration: "none" }}
                 >
                   <Cake size={14} /> Parabenizar
@@ -2137,7 +2148,8 @@ function PatientsList({ patients, events, onOpen, onNew, onQuickConsulta, onExpo
               {linkWhatsApp(p.whatsapp || p.telefone) && (
                 <a
                   href={linkWhatsApp(p.whatsapp || p.telefone, `Olá, ${p.responsavel || ""}! Aqui é a Bárbara, nutricionista da ${p.nome}.`)}
-                  target="whatsapp_web" title="Abrir WhatsApp"
+                  onClick={(e) => abrirWhatsApp(e, linkWhatsApp(p.whatsapp || p.telefone, `Olá, ${p.responsavel || ""}! Aqui é a Bárbara, nutricionista da ${p.nome}.`))}
+                  title="Abrir WhatsApp"
                   style={{
                     background: "#EFE6D8", borderRadius: 8, padding: 6,
                     display: "flex", color: "#867A6E", cursor: "pointer", width: "fit-content"
@@ -2507,7 +2519,7 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                 {linkWhatsApp(patient.whatsapp || patient.telefone) && (
                   <a
                     href={linkWhatsApp(patient.whatsapp || patient.telefone, `Olá, ${patient.responsavel || ""}! Aqui é a Bárbara, nutricionista da ${patient.nome}.`)}
-                    target="whatsapp_web"
+                    onClick={(e) => abrirWhatsApp(e, linkWhatsApp(patient.whatsapp || patient.telefone, `Olá, ${patient.responsavel || ""}! Aqui é a Bárbara, nutricionista da ${patient.nome}.`))}
                     style={styles.contactActionBtn}
                   >
                     <MessageCircle size={13} /> WhatsApp
@@ -3496,8 +3508,8 @@ function FollowupsBoard({ followups, patients, onMove, onUpdate, onAdd, onDelete
         )}
         {linkWpp && (
           <a
-            href={linkWpp} target="whatsapp_web"
-            onClick={() => marcarContato(f)}
+            href={linkWpp}
+            onClick={(e) => { abrirWhatsApp(e, linkWpp); marcarContato(f); }}
             style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, color: "#918567", fontWeight: 600, textDecoration: "none" }}
           >
             <MessageCircle size={13} /> {f.tipo === "Consulta atrasada" ? "Cobrar retorno por WhatsApp" : "Reativar por WhatsApp"}
