@@ -1898,7 +1898,7 @@ function Dashboard({ patients, followups, setView, setSelectedId, setFiltroPacie
               {linkWhatsApp(p.whatsapp || p.telefone) && (
                 <a
                   href={linkWhatsApp(p.whatsapp || p.telefone, `Olá, ${p.responsavel || ""}! Passando para desejar um feliz aniversário para a ${p.nome}! 🎂`)}
-                  target="whatsapp_web" rel="noopener noreferrer"
+                  target="whatsapp_web"
                   style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#918567", fontWeight: 600, textDecoration: "none" }}
                 >
                   <Cake size={14} /> Parabenizar
@@ -2137,7 +2137,7 @@ function PatientsList({ patients, events, onOpen, onNew, onQuickConsulta, onExpo
               {linkWhatsApp(p.whatsapp || p.telefone) && (
                 <a
                   href={linkWhatsApp(p.whatsapp || p.telefone, `Olá, ${p.responsavel || ""}! Aqui é a Bárbara, nutricionista da ${p.nome}.`)}
-                  target="whatsapp_web" rel="noopener noreferrer" title="Abrir WhatsApp"
+                  target="whatsapp_web" title="Abrir WhatsApp"
                   style={{
                     background: "#EFE6D8", borderRadius: 8, padding: 6,
                     display: "flex", color: "#867A6E", cursor: "pointer", width: "fit-content"
@@ -2507,7 +2507,7 @@ function PatientDetail({ patient, onClose, onUpdate, onQuickConsulta, onAddMedic
                 {linkWhatsApp(patient.whatsapp || patient.telefone) && (
                   <a
                     href={linkWhatsApp(patient.whatsapp || patient.telefone, `Olá, ${patient.responsavel || ""}! Aqui é a Bárbara, nutricionista da ${patient.nome}.`)}
-                    target="whatsapp_web" rel="noopener noreferrer"
+                    target="whatsapp_web"
                     style={styles.contactActionBtn}
                   >
                     <MessageCircle size={13} /> WhatsApp
@@ -3496,7 +3496,7 @@ function FollowupsBoard({ followups, patients, onMove, onUpdate, onAdd, onDelete
         )}
         {linkWpp && (
           <a
-            href={linkWpp} target="whatsapp_web" rel="noopener noreferrer"
+            href={linkWpp} target="whatsapp_web"
             onClick={() => marcarContato(f)}
             style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, color: "#918567", fontWeight: 600, textDecoration: "none" }}
           >
