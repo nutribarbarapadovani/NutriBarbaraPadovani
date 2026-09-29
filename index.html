@@ -3399,7 +3399,9 @@ function FollowupsBoard({ followups, patients, onMove, onUpdate, onAdd, onDelete
   const mensagemReativacao = (p) =>
     `Oiê ${p?.responsavel || ""}! Passando para saber se ainda tem interesse em agendar aquela conversa sobre a alimentação da ${p?.nome || ""}. Continuo à disposição quando quiser retomar! 💛`;
   const mensagemConsultaAtrasada = (p) =>
-    `Oiê ${p?.responsavel || ""}! Passando para saber se conseguiu pensar em um horário para o retorno da ${p?.nome || ""}. Qualquer horário, me avisa! 💛`;
+    p?.acompanhamento?.tipoId === "introducao_alimentar"
+      ? "Olá, bom diaa! Como estão?\n\nAlguma dúvida por aí? Tudo certinho?🥰"
+      : "Olá, bom diaa! Como estão?\n\nComo estamos com os combinados por aí? 🥰";
   const mensagemPara = (f, p) => (f.tipo === "Consulta atrasada" ? mensagemConsultaAtrasada(p) : mensagemReativacao(p));
 
   const naoConcluidos = followups.filter((f) => f.coluna !== "concluido");
