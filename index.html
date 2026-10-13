@@ -181,6 +181,23 @@ const addMesesData = (dataStr, meses) => {
   return d.toISOString().slice(0, 10);
 };
 
+const addDiasData = (dias, base) => {
+  const d = base ? new Date(base + "T00:00:00") : new Date();
+  d.setDate(d.getDate() + dias);
+  return d.toISOString().slice(0, 10);
+};
+
+let janelaWhatsApp = null;
+const abrirWhatsApp = (e, url) => {
+  if (e) e.preventDefault();
+  if (janelaWhatsApp && !janelaWhatsApp.closed) {
+    janelaWhatsApp.location.href = url;
+    janelaWhatsApp.focus();
+  } else {
+    janelaWhatsApp = window.open(url, "whatsapp_web");
+  }
+};
+
 const dataNascimentoDeIdade = (anos, meses) => {
   const hoje = new Date();
   hoje.setFullYear(hoje.getFullYear() - (Number(anos) || 0));
@@ -896,7 +913,8 @@ function followupFromRow(r) {
   return {
     id: r.id, pacienteId: r.paciente_id, titulo: r.titulo, tipo: r.tipo || "",
     prioridade: r.prioridade || "media", prazo: r.prazo || "", coluna: r.coluna || "afazer",
-    responsavel: r.responsavel || "Nutricionista", googleEventId: r.google_event_id || undefined
+    responsavel: r.responsavel || "Nutricionista", googleEventId: r.google_event_id || undefined,
+    mensagem: r.mensagem || ""
   };
 }
 
@@ -995,6 +1013,14 @@ function App() {
     });
   }, [googleClientId, contratosModelo, loaded]);
 
+  // Um contato nunca tem dois cards ao mesmo tempo: vale qualquer card pendente
+  // (em qualquer coluna) ou um card concluído cuja data de reativação ainda não chegou.
+  const followupsCriadosRef = useRef(new Set());
+  const pacienteTemFollowup = (pacienteId, hoje) => {
+    if (followupsCriadosRef.current.has(pacienteId)) return true;
+    return followups.some((f) => f.pacienteId === pacienteId && (f.coluna !== "concluido" || (f.prazo && f.prazo > hoje)));
+  };
+
   useEffect(() => {
     if (!loaded) return;
     const hoje = new Date().toISOString().slice(0, 10);
@@ -1002,11 +1028,10 @@ function App() {
       if (p.status !== "prospect") return;
       const dias = diasDesde(p.ultimoContato);
       if (dias === null || dias < 30) return;
-      const jaTem = followups.some((f) => f.pacienteId === p.id && f.coluna !== "concluido" && f.tipo === "Reativação de prospecção");
-      if (jaTem) return;
+      if (pacienteTemFollowup(p.id, hoje)) return;
       addFollowup({
         pacienteId: p.id,
-        titulo: `Reativação — ${p.nome}`,
+        titulo: `Reativação: ${p.nome}`,
         tipo: "Reativação de prospecção",
         prioridade: "media",
         prazo: hoje,
@@ -1024,11 +1049,10 @@ function App() {
       if (!p.proximaConsultaPrevista) return;
       const diasAtraso = diasDesde(p.proximaConsultaPrevista);
       if (diasAtraso === null || diasAtraso < 7) return;
-      const jaTem = followups.some((f) => f.pacienteId === p.id && f.coluna !== "concluido" && f.tipo === "Consulta atrasada");
-      if (jaTem) return;
+      if (pacienteTemFollowup(p.id, hoje)) return;
       addFollowup({
         pacienteId: p.id,
-        titulo: `Consulta atrasada — ${p.nome}`,
+        titulo: `Consulta atrasada: ${p.nome}`,
         tipo: "Consulta atrasada",
         prioridade: "alta",
         prazo: hoje,
@@ -1477,9 +1501,47 @@ function App() {
     }
   };
 
+  // Muda a coluna e grava data/mensagem escolhidas após o contato.
+  const atualizarFollowupContato = (id, coluna, prazo, mensagem, registrarContato) => {
+    const followup = followups.find((f) => f.id === id);
+    const hoje = new Date().toISOString().slice(0, 10);
+    setFollowups((prev) => prev.map((f) => (f.id === id ? { ...f, coluna, prazo, mensagem: mensagem || "" } : f)));
+    supabaseClient.from("followups").update({ coluna, prazo: prazo || null }).eq("id", id)
+      .then(() => {}).catch((e) => console.error("Falha ao atualizar follow-up:", e));
+    // Coluna "mensagem" é opcional no banco: se ainda não existir, o erro é ignorado.
+    supabaseClient.from("followups").update({ mensagem: mensagem || "" }).eq("id", id)
+      .then(() => {}).catch(() => {});
+    if (registrarContato && followup?.pacienteId) updatePatient(followup.pacienteId, { ultimoContato: hoje });
+    if (coluna === "concluido" && googleToken && followup?.googleEventId) {
+      excluirEventoGoogle(googleToken, followup.googleEventId)
+        .then(() => logSync(`Follow-up concluído, removido do Google Agenda: ${followup.titulo}`))
+        .catch((err) => logSync(err.message, false));
+    }
+  };
+
+  // Remove cards repetidos: mantém um por contato (o mais avançado no quadro).
+  const limparFollowupsDuplicados = () => {
+    const ordem = { concluido: -1, afazer: 0, hoje: 1, aguardando: 2, andamento: 3 };
+    const porPaciente = {};
+    followups.filter((f) => f.coluna !== "concluido").forEach((f) => {
+      (porPaciente[f.pacienteId] = porPaciente[f.pacienteId] || []).push(f);
+    });
+    const remover = [];
+    Object.values(porPaciente).forEach((lista) => {
+      if (lista.length < 2) return;
+      const manter = lista.reduce((a, b) => ((ordem[b.coluna] ?? 0) > (ordem[a.coluna] ?? 0) ? b : a));
+      lista.forEach((f) => { if (f.id !== manter.id) remover.push(f.id); });
+    });
+    if (remover.length === 0) { logSync("Nenhum contato repetido no Follow-up."); return; }
+    if (!window.confirm(`Foram encontrados ${remover.length} card(s) repetido(s). Será mantido apenas um por contato. Confirmar limpeza?`)) return;
+    remover.forEach((id) => deleteFollowup(id));
+    logSync(`${remover.length} card(s) repetido(s) removido(s) do Follow-up.`);
+  };
+
   const addFollowup = (followup) => {
     const localId = uid();
     const novo = { ...followup, id: localId };
+    if (followup.pacienteId) followupsCriadosRef.current.add(followup.pacienteId);
     setFollowups((prev) => [novo, ...prev]);
     supabaseClient.from("followups").insert(followupToRow(novo))
       .then(() => {}).catch((e) => console.error("Falha ao criar follow-up:", e));
@@ -1499,7 +1561,8 @@ function App() {
     daqui7dias.setDate(daqui7dias.getDate() + 7);
     const prazo = daqui7dias.toISOString().slice(0, 10);
     const prospeccoes = patients.filter((p) => p.status === "prospect");
-    const pendentes = prospeccoes.filter((p) => !followups.some((f) => f.pacienteId === p.id && f.coluna !== "concluido"));
+    const hojeISO = new Date().toISOString().slice(0, 10);
+    const pendentes = prospeccoes.filter((p) => !pacienteTemFollowup(p.id, hojeISO));
 
     if (pendentes.length === 0) {
       logSync("Todas as prospecções já têm um follow-up pendente.");
@@ -1514,7 +1577,7 @@ function App() {
     let criados = 0;
     pendentes.forEach((p) => {
       addFollowup({
-        pacienteId: p.id, titulo: `Follow-up de prospecção — ${p.nome}`, tipo: "Fazer follow-up",
+        pacienteId: p.id, titulo: `Follow-up de prospecção: ${p.nome}`, tipo: "Fazer follow-up",
         prioridade: "media", prazo, coluna: "afazer", responsavel: "Nutricionista"
       });
       criados++;
@@ -2000,7 +2063,7 @@ function App() {
           {view === "dashboard" && <Dashboard patients={patients} followups={followups} setView={setView} setSelectedId={setSelectedId} setFiltroPacientesInicial={setFiltroPacientesInicial} setFollowupsAbaInicial={setFollowupsAbaInicial} />}
           {view === "patients" && <PatientsList patients={filteredPatients} events={events} onOpen={(id) => setSelectedId(id)} onNew={() => setShowNewPatient(true)} onQuickConsulta={registrarConsultaHoje} onExportar={exportarPacientesExcel} onImportar={importarPacientesExcel} filtroInicial={filtroPacientesInicial} />}
           {view === "agenda" && <Agenda patients={patients} events={events} onAdd={addEvent} onUpdate={updateEvent} onDelete={deleteEvent} onOpen={(id) => setSelectedId(id)} />}
-          {view === "followups" && <FollowupsBoard followups={followups} patients={patients} onMove={moveFollowup} onAdd={addFollowup} onDelete={deleteFollowup} onCriarProspeccao={criarFollowupsProspeccao} onOpen={(id) => setSelectedId(id)} abaInicial={followupsAbaInicial} />}
+          {view === "followups" && <FollowupsBoard followups={followups} patients={patients} onMove={moveFollowup} onAdd={addFollowup} onDelete={deleteFollowup} onCriarProspeccao={criarFollowupsProspeccao} onContato={atualizarFollowupContato} onLimparDuplicados={limparFollowupsDuplicados} materiais={materiais} onOpen={(id) => setSelectedId(id)} abaInicial={followupsAbaInicial} />}
           {view === "financeiro" && <Financeiro patients={patients} onAddPagamento={addPagamento} onOpen={(id) => setSelectedId(id)} />}
           {view === "appContent" && <AppContent items={contentItems} onSave={salvarConteudo} onDelete={excluirConteudo} onTogglePublish={alternarPublicacao} onRestaurarVersao={restaurarVersaoConteudo} />}
           {view === "biblioteca" && <BibliotecaMateriais items={materiais} patients={patients} onSave={salvarMaterial} onDelete={excluirMaterial} onOpenPatient={(id) => setSelectedId(id)} />}
@@ -2936,7 +2999,7 @@ function PatientsList({ patients, events, onOpen, onNew, onQuickConsulta, onExpo
               {linkWhatsApp(p.whatsapp || p.telefone) && (
                 <a
                   href={linkWhatsApp(p.whatsapp || p.telefone, `Olá, ${p.responsavel || ""}! Aqui é a Bárbara, nutricionista da ${p.nome}.`)}
-                  target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp"
+                  target="whatsapp_web" onClick={(e) => abrirWhatsApp(e, linkWhatsApp(p.whatsapp || p.telefone, `Olá, ${p.responsavel || ""}! Aqui é a Bárbara, nutricionista da ${p.nome}.`))} title="Abrir WhatsApp"
                   style={{
                     background: "#EFE6D8", borderRadius: 8, padding: 6,
                     display: "flex", color: "#867A6E", cursor: "pointer", width: "fit-content"
@@ -4623,7 +4686,7 @@ function EventModal({ patients, event, onClose, onSave }) {
   );
 }
 
-function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarProspeccao, onOpen, abaInicial }) {
+function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarProspeccao, onContato, onLimparDuplicados, materiais, onOpen, abaInicial }) {
   const hojeFollowup = new Date().toISOString().slice(0, 10);
   const [showModal, setShowModal] = useState(false);
   // Duas listas separadas: "clientes" (pacientes ativos, inativos ou com alta) e
@@ -4634,17 +4697,42 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
   useEffect(() => { if (abaInicial) setAba(abaInicial === "prospeccao" ? "prospeccao" : "clientes"); }, [abaInicial]);
   const patientOf = (id) => patients.find((p) => p.id === id);
   const patientName = (id) => patientOf(id)?.nome || "—";
+  const primeiroNome = (t) => (t || "").trim().split(/\s+/)[0];
   const mensagemReativacao = (p) =>
-    `Oiê ${p?.responsavel || ""}! Passando para saber se ainda tem interesse em agendar aquela conversa sobre a alimentação da ${p?.nome || ""}. Continuo à disposição quando quiser retomar! 💛`;
+    `Oi, ${primeiroNome(p?.responsavel)}! Tudo bem? 🥰\n\nAqui é a Bárbara! Lembrei de vocês e quis saber como estão as coisas com a alimentação ${p?.nome ? "do(a) " + primeiroNome(p.nome) : "da criança"}.\n\nComo estão sendo as refeições por aí? ❤️`;
   const mensagemConsultaAtrasada = (p) =>
-    `Oiê ${p?.responsavel || ""}! Passando para saber se conseguiu pensar em um horário para o retorno da ${p?.nome || ""}. Qualquer horário, me avisa! 💛`;
+    p?.acompanhamento?.tipoId === "introducao_alimentar"
+      ? "Olá, bom diaa! Como estão?\n\nAlguma dúvida por aí? Tudo certinho?🥰"
+      : "Olá, bom diaa! Como estão?\n\nComo estamos com os combinados por aí? 🥰";
   const mensagemPara = (f, p) => (f.tipo === "Consulta atrasada" ? mensagemConsultaAtrasada(p) : mensagemReativacao(p));
+  const mensagemPadraoDoCard = (f, p) => f.mensagem || mensagemPara(f, p);
+
+  // Ao mudar de coluna após um contato, abre um passo rápido para definir a próxima data.
+  const [movendo, setMovendo] = useState(null);
+  const COLUNAS_COM_PASSO = ["hoje", "andamento", "aguardando", "concluido"];
+  const mudarColuna = (f, coluna) => {
+    if (COLUNAS_COM_PASSO.includes(coluna) && f.coluna !== coluna) setMovendo({ f, coluna });
+    else onMove(f.id, coluna);
+  };
+
+  // Mantém um único card pendente por contato (o mais avançado); concluídos ficam todos.
+  const ordemColuna = { afazer: 0, hoje: 1, aguardando: 2, andamento: 3 };
+  const idsOcultos = new Set();
+  {
+    const porPaciente = {};
+    followups.filter((f) => f.coluna !== "concluido").forEach((f) => { (porPaciente[f.pacienteId] = porPaciente[f.pacienteId] || []).push(f); });
+    Object.values(porPaciente).forEach((lista) => {
+      if (lista.length < 2) return;
+      const manter = lista.reduce((a, b) => ((ordemColuna[b.coluna] ?? 0) > (ordemColuna[a.coluna] ?? 0) ? b : a));
+      lista.forEach((f) => { if (f.id !== manter.id) idsOcultos.add(f.id); });
+    });
+  }
 
   const ehDeProspeccao = (f) => patientOf(f.pacienteId)?.status === "prospect";
-  const pendente = (f) => f.coluna !== "concluido";
+  const pendente = (f) => f.coluna !== "concluido" && !idsOcultos.has(f.id);
   const contagemProspeccao = followups.filter((f) => ehDeProspeccao(f) && pendente(f)).length;
   const contagemClientes = followups.filter((f) => !ehDeProspeccao(f) && pendente(f)).length;
-  const followupsFiltrados = followups.filter((f) => (aba === "prospeccao" ? ehDeProspeccao(f) : !ehDeProspeccao(f)));
+  const followupsFiltrados = followups.filter((f) => !idsOcultos.has(f.id) && (aba === "prospeccao" ? ehDeProspeccao(f) : !ehDeProspeccao(f)));
   const pacientesDaAba = patients.filter((p) => (aba === "prospeccao" ? p.status === "prospect" : p.status !== "prospect"));
 
   return (
@@ -4654,6 +4742,11 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
         subtitle="Tarefas de relacionamento e cobrança"
         action={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {idsOcultos.size > 0 && (
+              <button style={styles.secondaryBtn} onClick={onLimparDuplicados}>
+                Limpar {idsOcultos.size} repetido{idsOcultos.size === 1 ? "" : "s"}
+              </button>
+            )}
             <button style={styles.secondaryBtn} onClick={onCriarProspeccao}>
               <Clock size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Follow-up p/ prospecções (1 semana)
             </button>
@@ -4698,8 +4791,12 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {items.map((f) => {
                   const paciente = patientOf(f.pacienteId);
-                  const linkWpp = paciente ? linkWhatsApp(paciente.whatsapp || paciente.telefone, f.mensagemSugerida || mensagemPara(f, paciente)) : null;
+                  const linkWpp = paciente ? linkWhatsApp(paciente.whatsapp || paciente.telefone, mensagemPadraoDoCard(f, paciente)) : null;
                   const prazoVencido = f.coluna !== "concluido" && f.prazo && f.prazo < hojeFollowup;
+                  const rotuloPrazo = f.coluna === "concluido" ? "Reativar em "
+                    : f.coluna === "aguardando" ? "Ver resposta em "
+                    : f.coluna === "andamento" ? "Próximo contato "
+                    : f.coluna === "hoje" ? "Retorno em " : "Prazo ";
                   return (
                     <div key={f.id} style={{ ...styles.kanbanCard, ...(prazoVencido ? { border: "1px solid #E6C7BA", background: "#FBF3EF" } : {}) }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -4727,11 +4824,11 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
                         {patientName(f.pacienteId)}
                       </div>
                       <div style={{ fontSize: 11, color: prazoVencido ? "#B4644A" : "#9C9284", fontWeight: prazoVencido ? 700 : 400, marginTop: 6 }}>
-                        {prazoVencido ? "Prazo vencido em " : "Prazo "}{formatData(f.prazo)} · {f.responsavel}
+                        {prazoVencido ? "Prazo vencido em " : rotuloPrazo}{formatData(f.prazo)} · {f.responsavel}
                       </div>
                       {linkWpp && (
                         <a
-                          href={linkWpp} target="_blank" rel="noopener noreferrer"
+                          href={linkWpp} target="whatsapp_web" onClick={(e) => abrirWhatsApp(e, linkWpp)}
                           style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, color: "#918567", fontWeight: 600, textDecoration: "none" }}
                         >
                           <MessageCircle size={13} /> {f.tipo === "Consulta atrasada" ? "Cobrar retorno por WhatsApp" : "Reativar por WhatsApp"}
@@ -4739,7 +4836,7 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
                       )}
                       <select
                         value={f.coluna}
-                        onChange={(e) => onMove(f.id, e.target.value)}
+                        onChange={(e) => mudarColuna(f, e.target.value)}
                         style={styles.kanbanSelect}
                       >
                         {KANBAN_COLS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
@@ -4754,6 +4851,22 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
         })}
       </div>
 
+      {movendo && (
+        <PassoContatoModal
+          followup={movendo.f}
+          coluna={movendo.coluna}
+          paciente={patientOf(movendo.f.pacienteId)}
+          mensagemInicial={mensagemPadraoDoCard(movendo.f, patientOf(movendo.f.pacienteId))}
+          mensagemReativacao={mensagemReativacao(patientOf(movendo.f.pacienteId))}
+          materiais={materiais || []}
+          onClose={() => setMovendo(null)}
+          onConfirm={(prazo, mensagem) => {
+            onContato(movendo.f.id, movendo.coluna, prazo, mensagem, true);
+            setMovendo(null);
+          }}
+        />
+      )}
+
       {showModal && (
         <FollowupModal
           patients={pacientesDaAba}
@@ -4762,6 +4875,94 @@ function FollowupsBoard({ followups, patients, onMove, onAdd, onDelete, onCriarP
           onSave={(f) => { onAdd(f); setShowModal(false); }}
         />
       )}
+    </div>
+  );
+}
+
+function PassoContatoModal({ followup, coluna, paciente, mensagemInicial, mensagemReativacao, materiais, onClose, onConfirm }) {
+  const CONFIG = {
+    hoje: {
+      titulo: "Conversa de hoje registrada",
+      ajuda: "Hoje será salvo como a data do último contato. Informe quando deve ser o próximo retorno.",
+      rotulo: "Próximo retorno", dias: 7, mensagem: false
+    },
+    aguardando: {
+      titulo: "Aguardando a família",
+      ajuda: "Informe quando verificar se a família respondeu.",
+      rotulo: "Verificar resposta em", dias: 2, mensagem: false
+    },
+    andamento: {
+      titulo: "Em andamento",
+      ajuda: "Informe o próximo contato e, se quiser, a mensagem com a isca (material ou convite).",
+      rotulo: "Próximo contato", dias: 7, mensagem: true
+    },
+    concluido: {
+      titulo: "Concluído",
+      ajuda: "A data antiga deixa de aparecer. O contato volta ao quadro na data de reativação, com a mensagem abaixo.",
+      rotulo: "Reativar em", dias: 0, meses: 6, mensagem: true
+    }
+  }[coluna];
+  const inicial = CONFIG.meses ? addMesesData(new Date().toISOString().slice(0, 10), CONFIG.meses) : addDiasData(CONFIG.dias);
+  const [prazo, setPrazo] = useState(inicial);
+  const [mensagem, setMensagem] = useState(coluna === "concluido" ? mensagemReativacao : (coluna === "andamento" ? (followup.mensagem || "") : ""));
+  const nomeResp = paciente?.responsavel || "";
+  const primeiroNome = (t) => (t || "").trim().split(/\s+/)[0];
+  const ISCAS = [
+    { id: "material", label: "Material gratuito", texto: `Oi, ${primeiroNome(nomeResp)}! Tudo bem? 🥰\n\nAqui é a Bárbara! Separei um material que pode ajudar muito nas refeições por aí. Posso te enviar? ❤️` },
+    { id: "receitas", label: "Receitas e ideias", texto: `Oi, ${primeiroNome(nomeResp)}! Tudo bem? 🥰\n\nAqui é a Bárbara! Tenho algumas ideias de receitas simples que combinam com a rotina de vocês. Quer que eu te envie? ❤️` },
+    { id: "duvidas", label: "Tirar dúvidas", texto: `Oi, ${primeiroNome(nomeResp)}! Tudo bem? 🥰\n\nAqui é a Bárbara! Se surgir qualquer dúvida sobre a alimentação, pode me chamar por aqui. Estou à disposição! ❤️` }
+  ];
+  const publicados = materiais.slice(0, 40);
+  return (
+    <div style={styles.overlay} onClick={onClose}>
+      <div style={{ ...styles.modal, width: 480 }} className="modal" onClick={(e) => e.stopPropagation()}>
+        <div style={styles.drawerHeader} className="drawer-header">
+          <div style={{ fontFamily: "Playfair Display, serif", fontSize: 18, fontWeight: 600, color: "#16332E" }}>{CONFIG.titulo}</div>
+          <button style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
+        </div>
+        <div style={{ padding: 20, display: "grid", gap: 12 }}>
+          <div style={{ fontSize: 12, color: "#6E6355" }}>{followup.titulo}{nomeResp ? ` · ${nomeResp}` : ""}</div>
+          <div style={{ fontSize: 12, color: "#9C9284" }}>{CONFIG.ajuda}</div>
+          <Field label={CONFIG.rotulo} type="date" value={prazo} onChange={setPrazo} />
+          {CONFIG.mensagem && (
+            <div>
+              {coluna === "andamento" && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                  {ISCAS.map((i) => (
+                    <button key={i.id} style={{ ...styles.secondaryBtn, padding: "4px 10px", fontSize: 12 }} onClick={() => setMensagem(i.texto)}>{i.label}</button>
+                  ))}
+                  {publicados.length > 0 && (
+                    <select
+                      style={{ ...styles.kanbanSelect, width: "auto", marginTop: 0 }}
+                      value=""
+                      onChange={(e) => {
+                        const m = publicados.find((x) => x.id === e.target.value);
+                        if (m) setMensagem(`Oi, ${primeiroNome(nomeResp)}! Tudo bem? 🥰\n\nAqui é a Bárbara! Separei o material "${m.titulo}" para vocês. Posso te enviar? ❤️`);
+                      }}
+                    >
+                      <option value="">Material da biblioteca</option>
+                      {publicados.map((m) => <option key={m.id} value={m.id}>{m.titulo}</option>)}
+                    </select>
+                  )}
+                </div>
+              )}
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#6E6355", marginBottom: 4 }}>
+                {coluna === "concluido" ? "Mensagem de reativação" : "Mensagem com a isca"}
+              </div>
+              <textarea
+                value={mensagem}
+                onChange={(e) => setMensagem(e.target.value)}
+                rows={5}
+                style={{ width: "100%", boxSizing: "border-box", border: "1px solid #E3DACB", borderRadius: 8, padding: 10, fontSize: 13, fontFamily: "inherit" }}
+              />
+            </div>
+          )}
+        </div>
+        <div className="modal-footer" style={{ padding: "16px 20px", borderTop: "1px solid #E3DACB", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button style={styles.secondaryBtn} onClick={onClose}>Cancelar</button>
+          <button style={styles.primaryBtn} onClick={() => { if (!prazo) return; onConfirm(prazo, mensagem.trim()); }}>Confirmar</button>
+        </div>
+      </div>
     </div>
   );
 }
